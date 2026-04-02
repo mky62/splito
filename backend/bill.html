@@ -1,0 +1,1047 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Split Bill</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+        :root {
+            --primary: #6366F1;
+            --primary-dark: #4F46E5;
+            --primary-light: #E0E7FF;
+            --primary-50: #EEF2FF;
+            --success: #10B981;
+            --success-light: #D1FAE5;
+            --success-bg: #ECFDF5;
+            --warning: #F59E0B;
+            --warning-light: #FEF3C7;
+            --danger: #EF4444;
+            --danger-light: #FEE2E2;
+            --bg: #F8FAFC;
+            --card: #FFFFFF;
+            --text: #0F172A;
+            --text-secondary: #475569;
+            --text-muted: #94A3B8;
+            --border: #E2E8F0;
+            --border-light: #F1F5F9;
+            --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+            --shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
+            --shadow-md: 0 4px 6px rgba(0,0,0,0.07), 0 2px 4px rgba(0,0,0,0.06);
+            --shadow-lg: 0 10px 15px rgba(0,0,0,0.1), 0 4px 6px rgba(0,0,0,0.05);
+        }
+
+        html { scroll-behavior: smooth; }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            max-width: 480px;
+            margin: 0 auto;
+            background: var(--bg);
+            min-height: 100vh;
+            color: var(--text);
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .content {
+            padding: 16px;
+            padding-top: 24px;
+        }
+
+        /* Card */
+        .card {
+            background: var(--card);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 16px;
+            box-shadow: var(--shadow);
+            animation: fadeUp 0.4s ease-out;
+        }
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        .card-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
+            background: var(--primary-light);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            flex-shrink: 0;
+        }
+        .card-title {
+            font-size: 17px;
+            font-weight: 700;
+            color: var(--text);
+        }
+        .card-subtitle {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-top: 2px;
+        }
+
+        /* Welcome Banner */
+        .welcome-banner {
+            background: linear-gradient(135deg, var(--primary-50) 0%, var(--primary-light) 100%);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+        .welcome-banner-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--primary-dark);
+            margin-bottom: 4px;
+        }
+        .welcome-banner-text {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        /* Input */
+        .input-group { margin-bottom: 16px; }
+        .input-label {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+            display: block;
+        }
+        .input {
+            width: 100%;
+            padding: 14px 16px;
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            font-size: 16px;
+            font-family: inherit;
+            color: var(--text);
+            background: var(--card);
+            transition: all 0.2s ease;
+        }
+        .input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+        }
+        .input::placeholder { color: var(--text-muted); }
+
+        /* Buttons */
+        .btn {
+            width: 100%;
+            padding: 14px 24px;
+            border: none;
+            border-radius: 12px;
+            font-size: 15px;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        .btn:active { transform: scale(0.98); }
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+            box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+        }
+        .btn-primary:hover:not(:disabled) { background: var(--primary-dark); }
+        .btn-success {
+            background: var(--success);
+            color: white;
+            box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+        }
+        .btn-success:hover:not(:disabled) { background: #059669; }
+        .btn-whatsapp {
+            background: #25D366;
+            color: white;
+        }
+        .btn-ghost {
+            background: transparent;
+            color: var(--text-secondary);
+            border: 2px solid var(--border);
+        }
+
+        /* Summary Bar */
+        .summary-bar {
+            background: var(--primary);
+            border-radius: 14px;
+            padding: 16px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: white;
+            margin-bottom: 16px;
+        }
+        .summary-label { font-size: 12px; opacity: 0.85; margin-bottom: 2px; }
+        .summary-count { font-size: 11px; opacity: 0.7; }
+        .summary-total { font-size: 24px; font-weight: 800; }
+
+        /* Items List */
+        .items-list { margin-bottom: 16px; }
+        .item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            margin: 0 -12px;
+            border-radius: 10px;
+            transition: all 0.15s ease;
+            cursor: pointer;
+        }
+        .item:active { background: var(--border-light); }
+        .item.selected { background: var(--success-bg); }
+        .item-checkbox {
+            width: 24px;
+            height: 24px;
+            border-radius: 6px;
+            border: 2px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            background: var(--card);
+            transition: all 0.15s ease;
+        }
+        .item.selected .item-checkbox {
+            background: var(--success);
+            border-color: var(--success);
+        }
+        .item-checkbox svg {
+            width: 14px;
+            height: 14px;
+            stroke: white;
+            stroke-width: 3;
+            opacity: 0;
+            transform: scale(0.5);
+            transition: all 0.15s ease;
+        }
+        .item.selected .item-checkbox svg { opacity: 1; transform: scale(1); }
+        .item-checkbox.disabled {
+            background: var(--warning-light);
+            border-color: var(--warning);
+            cursor: not-allowed;
+        }
+        .item-checkbox.disabled svg {
+            opacity: 1;
+            stroke: var(--warning);
+            transform: scale(1);
+        }
+        .item-content { flex: 1; min-width: 0; }
+        .item-name {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+        .item-price {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text);
+            flex-shrink: 0;
+        }
+        .item-price.discount { color: var(--danger); }
+
+        /* Badges */
+        .badge {
+            font-size: 10px;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .badge-tax { background: var(--warning-light); color: #B45309; }
+        .badge-discount { background: var(--danger-light); color: #DC2626; }
+
+        /* Participants */
+        .participants {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 12px;
+        }
+        .participant-chip {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: var(--primary-light);
+            color: var(--primary-dark);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            animation: popIn 0.3s ease-out;
+        }
+        @keyframes popIn {
+            from { opacity: 0; transform: scale(0.85); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        .participant-dot {
+            width: 6px;
+            height: 6px;
+            background: var(--success);
+            border-radius: 50%;
+        }
+        .participant-count {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-bottom: 10px;
+        }
+
+        /* Waiting State */
+        .waiting-card { text-align: center; padding: 24px 16px; }
+        .waiting-icon { font-size: 48px; margin-bottom: 16px; }
+        .waiting-title { font-size: 18px; font-weight: 700; margin-bottom: 6px; }
+        .waiting-message { font-size: 14px; color: var(--text-secondary); margin-bottom: 20px; }
+        .progress-container {
+            background: var(--border);
+            height: 8px;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 10px;
+        }
+        .progress-fill {
+            height: 100%;
+            background: var(--primary);
+            border-radius: 4px;
+            transition: width 0.5s ease;
+            position: relative;
+        }
+        .progress-text { font-size: 13px; color: var(--text-secondary); font-weight: 500; }
+
+        /* Results Hero */
+        .results-hero {
+            background: var(--primary);
+            border-radius: 16px;
+            padding: 28px 20px;
+            text-align: center;
+            color: white;
+            margin-bottom: 16px;
+        }
+        .results-avatar {
+            width: 56px;
+            height: 56px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 12px;
+            font-size: 24px;
+            font-weight: 700;
+        }
+        .results-name { font-size: 16px; opacity: 0.9; margin-bottom: 6px; }
+        .results-amount { font-size: 40px; font-weight: 800; letter-spacing: -1px; }
+        .results-label { font-size: 13px; opacity: 0.8; margin-top: 4px; }
+
+        /* Breakdown */
+        .breakdown-section { margin-top: 16px; }
+        .breakdown-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        .breakdown-title { font-size: 15px; font-weight: 700; }
+        .breakdown-count {
+            font-size: 12px;
+            color: var(--text-secondary);
+            background: var(--border-light);
+            padding: 3px 8px;
+            border-radius: 8px;
+        }
+        .breakdown-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border-light);
+        }
+        .breakdown-item:last-child { border-bottom: none; }
+        .breakdown-item-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex: 1;
+            min-width: 0;
+        }
+        .breakdown-item-check {
+            width: 20px;
+            height: 20px;
+            background: var(--success-light);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .breakdown-item-check svg { width: 12px; height: 12px; stroke: var(--success); stroke-width: 3; }
+        .breakdown-item-name {
+            font-size: 13px;
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .breakdown-item-price { font-size: 13px; font-weight: 600; margin-left: 8px; flex-shrink: 0; }
+
+        /* Expiry */
+        .expiry-note {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 20px;
+            padding-top: 16px;
+            border-top: 1px solid var(--border);
+        }
+
+        /* Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.6);
+            z-index: 1000;
+            align-items: flex-end;
+            justify-content: center;
+            backdrop-filter: blur(4px);
+        }
+        .modal-overlay.active { display: flex; }
+        .modal {
+            background: var(--card);
+            border-radius: 20px 20px 0 0;
+            padding: 24px;
+            width: 100%;
+            max-width: 480px;
+            animation: slideUp 0.3s ease-out;
+        }
+        @keyframes slideUp {
+            from { transform: translateY(100%); }
+            to { transform: translateY(0); }
+        }
+        .modal-handle {
+            width: 36px;
+            height: 4px;
+            background: var(--border);
+            border-radius: 2px;
+            margin: 0 auto 16px;
+        }
+        .modal h3 { font-size: 18px; font-weight: 700; text-align: center; margin-bottom: 4px; }
+        .modal-subtitle { font-size: 13px; color: var(--text-secondary); text-align: center; margin-bottom: 20px; }
+        .modal-amount-display {
+            text-align: center;
+            padding: 20px;
+            background: var(--success-bg);
+            border-radius: 12px;
+            margin-bottom: 16px;
+        }
+        .modal-amount-value { font-size: 32px; font-weight: 800; color: var(--success); }
+        .modal-amount-label { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+        .modal-footer { display: flex; gap: 10px; padding-top: 12px; }
+        .modal-footer .btn { flex: 1; }
+
+        /* Error */
+        .error-card {
+            background: var(--danger-light);
+            border-radius: 12px;
+            padding: 16px;
+            color: #991B1B;
+            font-size: 14px;
+            text-align: center;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 16px;
+        }
+        .error-icon {
+            width: 32px;
+            height: 32px;
+            background: var(--danger);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 16px;
+            flex-shrink: 0;
+        }
+
+        /* Loading */
+        .loading-screen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .loading-logo {
+            width: 64px;
+            height: 64px;
+            background: var(--primary);
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+            animation: pulse 2s ease-in-out infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        .loading-logo svg { width: 32px; height: 32px; stroke: white; }
+        .loading-text { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+        .loading-subtext { font-size: 14px; color: var(--text-secondary); }
+
+        /* Utility */
+        .hidden { display: none !important; }
+        .mt-2 { margin-top: 8px; }
+    </style>
+</head>
+<body>
+    <div class="loading-screen" id="loading">
+        <div class="loading-logo">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+                <line x1="16" y1="13" x2="8" y2="13"></line>
+                <line x1="16" y1="17" x2="8" y2="17"></line>
+            </svg>
+        </div>
+        <div class="loading-text">Loading bill...</div>
+        <div class="loading-subtext">Please wait a moment</div>
+    </div>
+
+    <div class="error-card hidden" id="error">
+        <div class="error-icon">!</div>
+        <div id="errorMessage">Something went wrong</div>
+    </div>
+
+    <div class="content hidden" id="mainContent">
+        <div class="card hidden" id="joinSection">
+            <div class="card-header">
+                <div class="card-icon">👋</div>
+                <div>
+                    <div class="card-title">Join this bill</div>
+                    <div class="card-subtitle">Enter your name to get started</div>
+                </div>
+            </div>
+            <div class="input-group">
+                <label class="input-label">Your Name</label>
+                <input type="text" id="nameInput" class="input" placeholder="e.g., Rahul" maxlength="30" autocomplete="name">
+            </div>
+            <button class="btn btn-primary" id="joinBtn" onclick="joinBill()">
+                <span>Let's Go</span>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <path d="M5 12h14M12 5l7 7-7 7"></path>
+                </svg>
+            </button>
+        </div>
+
+        <div class="card hidden" id="selectSection">
+            <div class="welcome-banner">
+                <div class="welcome-banner-title">Hey, <span id="userName"></span>!</div>
+                <div class="welcome-banner-text">Tap the items you had. Tax is shared equally.</div>
+            </div>
+
+            <div class="participant-count" id="participantCount"></div>
+            <div class="participants" id="participants"></div>
+
+            <div class="items-list" id="itemsList"></div>
+
+            <div class="summary-bar">
+                <div>
+                    <div class="summary-label">Your Selection</div>
+                    <div class="summary-count" id="selectedCount">0 items</div>
+                </div>
+                <div class="summary-total" id="selectedTotal">₹0</div>
+            </div>
+
+            <button class="btn btn-success" id="submitBtn" onclick="submitSelection()" disabled>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+                <span>Submit Selection</span>
+            </button>
+        </div>
+
+        <div class="card hidden" id="submittedWaitingSection">
+            <div class="waiting-card">
+                <div class="waiting-icon">⏳</div>
+                <div class="waiting-title">Waiting for others...</div>
+                <div class="waiting-message">Your selection is submitted. Others are still picking their items.</div>
+                <div class="participants" id="participantsSubmitted" style="justify-content: center; margin-bottom: 16px;"></div>
+                <div class="progress-container">
+                    <div class="progress-fill" id="progressFill2" style="width: 0%"></div>
+                </div>
+                <div class="progress-text" id="progressText2">0 of 0 ready</div>
+            </div>
+        </div>
+
+        <div class="card hidden" id="resultsSection">
+            <div class="results-hero">
+                <div class="results-avatar" id="userAvatar">R</div>
+                <div class="results-name" id="userNameResult"></div>
+                <div class="results-amount" id="userAmount">₹0</div>
+                <div class="results-label">Your share</div>
+            </div>
+
+            <div class="breakdown-section">
+                <div class="breakdown-header">
+                    <div class="breakdown-title">What you're paying for</div>
+                    <div class="breakdown-count" id="itemCount">0 items</div>
+                </div>
+                <div id="itemBreakdown"></div>
+            </div>
+
+            <button class="btn btn-whatsapp mt-2" onclick="openWhatsAppModal()">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="white">
+                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+                </svg>
+                <span>Send Payment Request</span>
+            </button>
+
+            <div class="expiry-note" id="expireNote">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <path d="M12 6v6l4 2"></path>
+                </svg>
+                <span>Link expires in <span id="expiresIn"></span></span>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="whatsappModal">
+        <div class="modal">
+            <div class="modal-handle"></div>
+            <h3>Request Payment</h3>
+            <div class="modal-subtitle">Send a payment request via WhatsApp</div>
+            <div class="modal-amount-display">
+                <div class="modal-amount-value" id="modalTotal">₹0</div>
+                <div class="modal-amount-label">Amount to request</div>
+            </div>
+            <div class="input-group">
+                <label class="input-label">Who should pay?</label>
+                <input type="text" id="payerNameInput" class="input" placeholder="Enter their name" maxlength="30">
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-ghost" onclick="closeWhatsAppModal()">Cancel</button>
+                <button class="btn btn-whatsapp" onclick="sendWhatsApp()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="white">
+                        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
+                    </svg>
+                    <span>Send</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const billId = window.location.pathname.split('/').pop();
+        const loading = document.getElementById('loading');
+        const errorDiv = document.getElementById('error');
+        const mainContent = document.getElementById('mainContent');
+        const joinSection = document.getElementById('joinSection');
+        const selectSection = document.getElementById('selectSection');
+        const resultsSection = document.getElementById('resultsSection');
+
+        let billData = null;
+        let userId = localStorage.getItem('bill_' + billId + '_userId') || null;
+        let userName = localStorage.getItem('bill_' + billId + '_userName') || '';
+        let hasSubmitted = false;
+        let pollInterval = null;
+        let expectedUsers = 0;
+        let selectedItems = new Set();
+        let currencySymbol = '₹';
+
+        async function loadBill() {
+            try {
+                const res = await fetch('/api/bill/' + billId);
+                if (!res.ok) {
+                    const data = await res.json();
+                    throw new Error(data.detail || 'Bill not found');
+                }
+                billData = await res.json();
+                loading.classList.add('hidden');
+
+                if (billData.expectedUsers) expectedUsers = billData.expectedUsers;
+                if (billData.currency && billData.currency.toLowerCase() === 'inr') currencySymbol = '₹';
+                else if (billData.currency) currencySymbol = billData.currency === 'USD' ? '$' : billData.currency;
+
+                mainContent.classList.remove('hidden');
+
+                if (userId) {
+                    const statusRes = await fetch('/api/bill/' + billId + '/status');
+                    const statusData = await statusRes.json();
+
+                    if (statusData.allSubmitted) {
+                        await showResults();
+                    } else {
+                        const selRes = await fetch('/api/bill/' + billId + '/selections');
+                        const selData = await selRes.json();
+                        const mySelection = selData.selections?.find(s => s.userId === userId);
+
+                        if (mySelection && mySelection.items && mySelection.items.length > 0) {
+                            hasSubmitted = true;
+                            showWaitingState();
+                        } else {
+                            showSelectSection();
+                            loadParticipants();
+                        }
+                    }
+                } else {
+                    document.getElementById('nameInput').value = userName;
+                    joinSection.classList.remove('hidden');
+                    loadParticipants();
+                }
+            } catch (err) {
+                loading.classList.add('hidden');
+                errorDiv.classList.remove('hidden');
+                document.getElementById('errorMessage').textContent = err.message || 'Failed to load bill';
+            }
+        }
+
+        async function joinBill() {
+            const name = document.getElementById('nameInput').value.trim();
+            if (!name) {
+                document.getElementById('nameInput').style.borderColor = '#EF4444';
+                document.getElementById('nameInput').focus();
+                return;
+            }
+
+            const btn = document.getElementById('joinBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span>Joining...</span>';
+
+            try {
+                const res = await fetch('/api/bill/' + billId + '/join', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userName: name, totalPeople: expectedUsers }),
+                });
+
+                if (!res.ok) throw new Error('Failed to join');
+
+                const data = await res.json();
+                userId = data.userId;
+                userName = name;
+
+                localStorage.setItem('bill_' + billId + '_userId', userId);
+                localStorage.setItem('bill_' + billId + '_userName', userName);
+
+                joinSection.classList.add('hidden');
+                showSelectSection();
+                loadParticipants();
+            } catch (err) {
+                btn.disabled = false;
+                btn.innerHTML = '<span>Let\'s Go</span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"></path></svg>';
+                alert('Failed to join: ' + err.message);
+            }
+        }
+
+        function showSelectSection() {
+            selectSection.classList.remove('hidden');
+            document.getElementById('userName').textContent = userName;
+
+            const itemsList = document.getElementById('itemsList');
+            itemsList.innerHTML = billData.items.map((item, i) => {
+                const isTax = item.type === 'tax';
+                const isDiscount = item.type === 'discount';
+                let badge = '';
+                if (isTax) badge = '<span class="badge badge-tax">Tax</span>';
+                else if (isDiscount) badge = '<span class="badge badge-discount">Discount</span>';
+
+                const priceClass = isDiscount ? 'item-price discount' : 'item-price';
+                const disabledClass = isTax ? 'disabled' : '';
+                const priceStr = isDiscount ? '-' + currencySymbol + Math.abs(item.price).toFixed(2) : currencySymbol + item.price.toFixed(2);
+
+                return '<div class="item" data-index="' + i + '" onclick="toggleItem(' + i + ', this)"><div class="item-checkbox ' + disabledClass + '"><svg viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div><div class="item-content"><div class="item-name">' + escapeHtml(item.name) + ' ' + badge + '</div></div><div class="' + priceClass + '">' + priceStr + '</div></div>';
+            }).join('');
+
+            updateSummary();
+        }
+
+        async function loadParticipants() {
+            try {
+                const res = await fetch('/api/bill/' + billId + '/selections');
+                if (!res.ok) return;
+                const data = await res.json();
+
+                const container = document.getElementById('participants');
+                const countEl = document.getElementById('participantCount');
+
+                if (data.selections && data.selections.length > 0) {
+                    container.innerHTML = data.selections
+                        .map(s => '<span class="participant-chip"><span class="participant-dot"></span>' + escapeHtml(s.userName) + '</span>')
+                        .join('');
+                    countEl.textContent = data.selections.length + ' participant' + (data.selections.length !== 1 ? 's' : '') + ' joined';
+                } else {
+                    container.innerHTML = '';
+                    countEl.textContent = 'Be the first to join!';
+                }
+            } catch (err) {
+                console.error('Failed to load participants:', err);
+            }
+        }
+
+        function toggleItem(index, element) {
+            const checkbox = element.querySelector('.item-checkbox');
+            if (checkbox.classList.contains('disabled')) return;
+
+            if (selectedItems.has(index)) {
+                selectedItems.delete(index);
+                element.classList.remove('selected');
+            } else {
+                selectedItems.add(index);
+                element.classList.add('selected');
+            }
+            updateSummary();
+        }
+
+        function updateSummary() {
+            let total = 0;
+            selectedItems.forEach(idx => { total += billData.items[idx].price; });
+
+            document.getElementById('selectedTotal').textContent = currencySymbol + total.toFixed(2);
+            document.getElementById('selectedCount').textContent = selectedItems.size + ' item' + (selectedItems.size !== 1 ? 's' : '');
+
+            const submitBtn = document.getElementById('submitBtn');
+            submitBtn.disabled = selectedItems.size === 0;
+        }
+
+        async function submitSelection() {
+            const btn = document.getElementById('submitBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span>Submitting...</span>';
+
+            try {
+                const res = await fetch('/api/bill/' + billId + '/select', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        userId: userId,
+                        userName: userName,
+                        items: Array.from(selectedItems),
+                    }),
+                });
+
+                if (!res.ok) throw new Error('Failed to submit');
+
+                hasSubmitted = true;
+                selectSection.classList.add('hidden');
+                showWaitingState();
+            } catch (err) {
+                btn.disabled = false;
+                btn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg><span>Submit Selection</span>';
+                alert('Failed to submit: ' + err.message);
+            }
+        }
+
+        function showWaitingState() {
+            const submittedWaiting = document.getElementById('submittedWaitingSection');
+            submittedWaiting.classList.remove('hidden');
+            loadParticipantsForSubmitted();
+            pollForCompletion();
+            pollInterval = setInterval(pollForCompletion, 2000);
+        }
+
+        async function pollForCompletion() {
+            try {
+                const res = await fetch('/api/bill/' + billId + '/status');
+                if (!res.ok) return;
+                const data = await res.json();
+
+                const numSubmitted = data.numSubmitted || 0;
+                const expected = data.expectedUsers || expectedUsers;
+                const allSubmitted = data.allSubmitted;
+
+                const pct = expected > 0 ? Math.min(100, (numSubmitted / expected) * 100) : 0;
+                const fill2 = document.getElementById('progressFill2');
+                const text2 = document.getElementById('progressText2');
+                if (fill2) fill2.style.width = pct + '%';
+                if (text2) text2.textContent = numSubmitted + ' of ' + expected + ' ready';
+
+                await loadParticipantsForSubmitted();
+
+                if (allSubmitted) {
+                    if (pollInterval) clearInterval(pollInterval);
+                    document.getElementById('submittedWaitingSection').classList.add('hidden');
+                    await showResults();
+                }
+            } catch (err) {
+                console.error('Poll error:', err);
+            }
+        }
+
+        async function loadParticipantsForSubmitted() {
+            try {
+                const res = await fetch('/api/bill/' + billId + '/selections');
+                if (!res.ok) return;
+                const data = await res.json();
+                const container = document.getElementById('participantsSubmitted');
+                if (data.selections && data.selections.length > 0) {
+                    container.innerHTML = data.selections
+                        .map(s => '<span class="participant-chip"><span class="participant-dot"></span>' + escapeHtml(s.userName) + '</span>')
+                        .join('');
+                } else {
+                    container.innerHTML = '';
+                }
+            } catch (err) {
+                console.error('Failed to load participants:', err);
+            }
+        }
+
+        async function showResults() {
+            resultsSection.classList.remove('hidden');
+
+            try {
+                const res = await fetch('/api/bill/' + billId + '/split');
+                if (!res.ok) throw new Error('Failed to load split');
+                const split = await res.json();
+
+                if (!split.allSubmitted) {
+                    resultsSection.classList.add('hidden');
+                    return;
+                }
+
+                renderUserBreakdown(split);
+                renderItemBreakdown(split);
+
+                if (billData.expiresAt) {
+                    updateExpiry();
+                    setInterval(updateExpiry, 60000);
+                }
+            } catch (err) {
+                document.getElementById('itemBreakdown').innerHTML = '<p style="color:#EF4444; padding: 12px 0; text-align: center;">Failed to load results: ' + err.message + '</p>';
+            }
+        }
+
+        function renderUserBreakdown(split) {
+            const myData = split.users?.[userId];
+            if (!myData) return;
+
+            userTotal = myData.total;
+            const initial = myData.name.charAt(0).toUpperCase();
+
+            document.getElementById('userAvatar').textContent = initial;
+            document.getElementById('userNameResult').textContent = myData.name;
+            document.getElementById('userAmount').textContent = currencySymbol + myData.total.toFixed(2);
+        }
+
+        function renderItemBreakdown(split) {
+            const myData = split.users?.[userId];
+            if (!myData) return;
+
+            const myItems = myData.items || [];
+            document.getElementById('itemCount').textContent = myItems.length + ' item' + (myItems.length !== 1 ? 's' : '');
+
+            if (myItems.length === 0) {
+                document.getElementById('itemBreakdown').innerHTML = '<p style="color:var(--text-secondary); padding: 12px 0; text-align: center;">No items selected (tax only)</p>';
+                return;
+            }
+
+            document.getElementById('itemBreakdown').innerHTML = myItems.map(item => {
+                let badge = '';
+                if (item.type === 'tax') badge = '<span class="badge badge-tax">Tax</span>';
+                else if (item.type === 'discount') badge = '<span class="badge badge-discount">Discount</span>';
+
+                return '<div class="breakdown-item"><div class="breakdown-item-left"><div class="breakdown-item-check"><svg viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div><div class="breakdown-item-name">' + escapeHtml(item.name) + ' ' + badge + '</div></div><div class="breakdown-item-price">' + currencySymbol + item.price.toFixed(2) + '</div></div>';
+            }).join('');
+        }
+
+        function updateExpiry() {
+            if (!billData.expiresAt) return;
+            const expires = new Date(billData.expiresAt);
+            const now = new Date();
+            const diff = expires - now;
+            if (diff <= 0) {
+                document.getElementById('expiresIn').textContent = 'expired';
+                return;
+            }
+            const hours = Math.floor(diff / 3600000);
+            const mins = Math.floor((diff % 3600000) / 60000);
+            document.getElementById('expiresIn').textContent = hours + 'h ' + mins + 'm';
+        }
+
+        let userTotal = 0;
+
+        function openWhatsAppModal() {
+            const modal = document.getElementById('whatsappModal');
+            document.getElementById('modalTotal').textContent = currencySymbol + userTotal.toFixed(2);
+            modal.classList.add('active');
+            document.getElementById('payerNameInput').focus();
+        }
+
+        function closeWhatsAppModal() {
+            const modal = document.getElementById('whatsappModal');
+            modal.classList.remove('active');
+            document.getElementById('payerNameInput').value = '';
+        }
+
+        function sendWhatsApp() {
+            const name = document.getElementById('payerNameInput').value.trim();
+            if (!name) {
+                document.getElementById('payerNameInput').style.borderColor = '#EF4444';
+                document.getElementById('payerNameInput').focus();
+                return;
+            }
+
+            const message = 'Hey! You owe ' + currencySymbol + userTotal.toFixed(2) + ' for the bill split. Please pay up!';
+            const encodedMessage = encodeURIComponent(message);
+            const whatsappUrl = 'https://wa.me/?text=' + encodedMessage;
+
+            window.open(whatsappUrl, '_blank');
+            closeWhatsAppModal();
+        }
+
+        document.getElementById('whatsappModal').addEventListener('click', function(e) {
+            if (e.target === this) closeWhatsAppModal();
+        });
+
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden && pollInterval) {
+                clearInterval(pollInterval);
+                pollInterval = null;
+            }
+        });
+
+        loadBill();
+    </script>
+</body>
+</html>

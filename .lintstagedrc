@@ -1,0 +1,4 @@
+{
+  "*.{ts,tsx}": ["eslint --fix"],
+  "*.py": ["python -m py_compile"]
+}

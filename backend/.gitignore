@@ -1,0 +1,28 @@
+# Secrets and credentials
+.env
+.env.*
+firebase-credentials.json
+*.pem
+*.key
+
+# Python
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+
+# Server artifacts
+server.log
+*.log
+
+# macOS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# typescript
+*.tsbuildinfo
