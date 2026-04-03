@@ -40,6 +40,7 @@ const resolveApiBaseUrl = (): string => {
 };
 
 const API_BASE = resolveApiBaseUrl();
+console.log('[API] Backend URL:', API_BASE);
 
 // Helper for handling responses
 async function handleResponse<T>(response: Response): Promise<T> {

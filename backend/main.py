@@ -179,7 +179,6 @@ SUMMARY_NAMES = {
     "total due", "total amount", "total rs.", "total rs", "total",
     "subtotal", "sub total", "sub-total",
     "net total", "net amount", "net rs.", "net rs", "net",
-    "surcharge", "surcharges", "gratuity",
 }
 
 TOTAL_PRIORITY = [

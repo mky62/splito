@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   StyleSheet,
   Text,
@@ -7,7 +7,6 @@ import {
   Alert,
   ScrollView,
   StatusBar,
-  Image,
   ActivityIndicator,
 } from 'react-native';
 import {
@@ -19,7 +18,7 @@ import { ArrowLeft, Camera } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 
 export default function HomeScreen() {
-  const [loading, setLoading] = useState(false);
+  const loading = false;
   const navigation = useNavigation<any>();
 
   const handleImageResponse = async (response: ImagePickerResponse) => {
@@ -203,5 +202,4 @@ instructionText: {
     width: 40,
   },
 });
-
 

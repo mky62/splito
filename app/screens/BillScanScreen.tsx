@@ -83,6 +83,29 @@ const BillScanScreen: React.FC<BillScanScreenProps> = ({ route, navigation }) =>
     }
   }, [imageUri, isProcessing, setExtracting, setExtracted, setExtractionError]);
 
+  const pollIntervalRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const pollSplit = useCallback(async (billId: string) => {
+    try {
+      const { getSplitResults } = await import('../services/api');
+      const data = await getSplitResults(billId);
+      updateSplitResults({
+        allSubmitted: data.allSubmitted,
+        numSubmitted: data.numSubmitted || 0,
+        expectedUsers: data.expectedUsers || 0,
+        users: (data.users as any) || {},
+      });
+    } catch {
+      // Silently ignore poll errors — next poll will retry
+    }
+  }, [updateSplitResults]);
+
+  const startSplitPolling = useCallback((billId: string) => {
+    if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+    pollSplit(billId);
+    pollIntervalRef.current = setInterval(() => pollSplit(billId), 3000);
+  }, [pollSplit]);
+
   const generateLink = useCallback(async () => {
     if (!currentBill.billId) return;
 
@@ -97,30 +120,7 @@ const BillScanScreen: React.FC<BillScanScreenProps> = ({ route, navigation }) =>
     } finally {
       setLinkGenerating(false);
     }
-  }, [currentBill.billId, splitSettings.totalPeople, setLinkGenerating, setLinkGenerated]);
-
-  const pollIntervalRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const startSplitPolling = useCallback((billId: string) => {
-    if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-    pollSplit(billId);
-    pollIntervalRef.current = setInterval(() => pollSplit(billId), 3000);
-  }, []);
-
-  const pollSplit = useCallback(async (billId: string) => {
-    try {
-      const { getSplitResults } = await import('../services/api');
-      const data = await getSplitResults(billId);
-      updateSplitResults({
-        allSubmitted: data.allSubmitted,
-        numSubmitted: data.numSubmitted || 0,
-        expectedUsers: data.expectedUsers || 0,
-        users: (data.users as any) || [],
-      });
-    } catch {
-      // Silently ignore poll errors — next poll will retry
-    }
-  }, [updateSplitResults]);
+  }, [currentBill.billId, splitSettings.totalPeople, setLinkGenerating, setLinkGenerated, startSplitPolling]);
 
   useEffect(() => {
     return () => {
@@ -205,7 +205,7 @@ const BillScanScreen: React.FC<BillScanScreenProps> = ({ route, navigation }) =>
           <ShareLinkCard shareLink={splitSettings.shareLink} totalPeople={splitSettings.totalPeople} />
         )}
 
-        {splitResults.allSubmitted && (
+        {splitSettings.linkGenerated && (splitResults.expectedUsers > 0 || splitResults.numSubmitted > 0 || splitResults.allSubmitted) && (
           <SplitResults splitData={splitResults as any} />
         )}
       </ScrollView>

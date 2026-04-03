@@ -39,7 +39,7 @@ export const SplitSettings: React.FC<SplitSettingsProps> = ({
           <TextInput
             style={styles.peopleCountInput}
             value={totalPeople.toString()}
-            onChangeText={text => onTotalPeopleChange(parseInt(text) || 2)}
+            onChangeText={text => onTotalPeopleChange(parseInt(text, 10) || 2)}
             keyboardType="numeric"
           />
           <TouchableOpacity

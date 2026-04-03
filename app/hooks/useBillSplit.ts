@@ -53,14 +53,14 @@ export function useBillExtraction(): UseBillExtractionReturn {
         setBillId(response.bill_id);
       }
     } catch (err: unknown) {
-      const error = err as { name?: string; message?: string };
+      const caughtError = err as { name?: string; message?: string };
       let errorMessage = 'Failed to extract items';
-      if (error.name === 'AbortError') {
+      if (caughtError.name === 'AbortError') {
         errorMessage = 'Request timed out. OCR processing is taking too long.';
-      } else if (error.message?.includes('Network request failed') || error.message?.includes('Failed to fetch')) {
+      } else if (caughtError.message?.includes('Network request failed') || caughtError.message?.includes('Failed to fetch')) {
         errorMessage = 'Cannot connect to server. Please check your network and ensure the backend is running.';
-      } else if (error.message) {
-        errorMessage = error.message;
+      } else if (caughtError.message) {
+        errorMessage = caughtError.message;
       }
 
       setError(errorMessage);

@@ -14,7 +14,8 @@ logger = logging.getLogger(__name__)
 _initialized = False
 _init_lock = threading.Lock()
 
-TAX_ITEM_TYPES = {"tax", "total", "subtotal", "net", "gratuity", "surcharge", "discount"}
+TAX_ITEM_TYPES = {"tax", "total", "subtotal", "net", "gratuity", "surcharge"}
+SPLIT_ACROSS_ALL_TYPES = TAX_ITEM_TYPES | {"discount"}
 
 
 def _get_db() -> firestore.firestore.Client:
@@ -238,7 +239,7 @@ def calculate_split(bill_id: str) -> Optional[Dict[str, Any]]:
     """Calculate bill split based on selections.
 
     For regular items: cost is split among users who selected that item.
-    For tax items: cost is split equally among ALL users.
+    For tax/charge/discount items: cost is split equally among ALL users.
 
     Uses integer-cent arithmetic to prevent rounding drift.
 
@@ -290,7 +291,8 @@ def calculate_split(bill_id: str) -> Optional[Dict[str, Any]]:
         item_price = item.get("price", 0) or 0
         item_type = item.get("type", "item")
 
-        if item_type in TAX_ITEM_TYPES:
+        if item_type in SPLIT_ACROSS_ALL_TYPES:
+            split_item_type = "discount" if item_type == "discount" else "tax"
             total_cents = round(item_price * 100)
             shares_cents = _split_cents(total_cents, num_users)
 
@@ -303,7 +305,7 @@ def calculate_split(bill_id: str) -> Optional[Dict[str, Any]]:
                         "name": item_name,
                         "price": item_price,
                         "share": share,
-                        "type": "tax",
+                        "type": split_item_type,
                     }
                 )
                 selectors.append({"userId": uid, "share": share})
@@ -314,7 +316,7 @@ def calculate_split(bill_id: str) -> Optional[Dict[str, Any]]:
                     "index": idx,
                     "name": item_name,
                     "price": item_price,
-                    "type": "tax",
+                    "type": split_item_type,
                     "splitAmong": "all",
                     "sharePerUser": base_share,
                     "selectors": selectors,

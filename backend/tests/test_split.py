@@ -205,3 +205,38 @@ class TestCalculateSplit:
 
             assert result is not None
             assert len(result["users"]) == 2
+            assert result["users"]["user-0"]["total"] == 19.00
+            assert result["users"]["user-1"]["total"] == -1.00
+
+            discount_item = next(
+                item for item in result["items"] if item["name"] == "Discount 10%"
+            )
+            assert discount_item["type"] == "discount"
+            assert discount_item["splitAmong"] == "all"
+
+
+class TestSaveBill:
+    """Tests for save_bill metadata fields."""
+
+    def test_tax_total_excludes_discount(self):
+        from services.firebase import save_bill
+
+        with patch("services.firebase._get_db") as mock_get_db:
+            db = MagicMock()
+            doc_ref = MagicMock()
+            doc_ref.id = "bill-123"
+            db.collection.return_value.document.return_value = doc_ref
+            mock_get_db.return_value = db
+
+            save_bill(
+                items=[
+                    {"name": "Burger", "price": 20.0, "type": "item"},
+                    {"name": "Tax", "price": 2.0, "type": "tax"},
+                    {"name": "Discount", "price": -5.0, "type": "discount"},
+                ],
+                currency="USD",
+                total=17.0,
+            )
+
+            payload = doc_ref.set.call_args.args[0]
+            assert payload["taxTotal"] == 2.0
