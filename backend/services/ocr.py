@@ -8,6 +8,9 @@ from huggingface_hub import InferenceClient
 
 logger = logging.getLogger(__name__)
 
+EXTRACTION_MODEL = os.environ.get("OCR_EXTRACTION_MODEL", "Qwen/Qwen2.5-VL-72B-Instruct")
+CORRECTION_MODEL = os.environ.get("OCR_CORRECTION_MODEL", "openai/gpt-oss-120b")
+
 EXTRACTION_SYSTEM = (
     "You are a receipt OCR engine. Output only valid JSON. "
     "Never explain or add commentary."
@@ -81,7 +84,7 @@ class OCRService:
 
         logger.info("Starting extraction with vision model")
         completion = self.client.chat.completions.create(
-            model="Qwen/Qwen2.5-VL-72B-Instruct:hyperbolic",
+            model=EXTRACTION_MODEL,
             messages=[
                 {
                     "role": "system",
@@ -202,7 +205,7 @@ class OCRService:
 
         try:
             completion = self.client.chat.completions.create(
-                model="openai/gpt-oss-120b:groq",
+                model=CORRECTION_MODEL,
                 messages=[
                     {
                         "role": "system",
