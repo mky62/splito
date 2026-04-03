@@ -6,7 +6,6 @@ from unittest.mock import MagicMock
 # Mock huggingface_hub before importing ocr
 sys.modules.setdefault("huggingface_hub", MagicMock())
 
-import json
 from services.ocr import OCRService
 
 
@@ -92,6 +91,60 @@ class TestNormalizeItems:
         items = [{"name": "Item", "price": 12.567}]
         result = self.service._normalize_items(items)
         assert result[0]["price"] == 12.57
+
+
+class TestCorrectionGating:
+    """Test correction-skip and fallback heuristics."""
+
+    def setup_method(self):
+        self.service = OCRService.__new__(OCRService)
+        self.service.client = MagicMock()
+
+    def test_should_skip_correction_when_clean(self):
+        parse_meta = {"parse_mode": "direct_json"}
+        sanitize_stats = {
+            "raw_items": 2,
+            "kept_items": 2,
+            "dropped_items": 0,
+            "coerced_prices": 0,
+            "trimmed_names": 0,
+            "total_delta": 0.0,
+        }
+        items = [{"name": "Burger", "price": 10.0}, {"name": "Tax", "price": 1.0}]
+        assert self.service._should_skip_correction(parse_meta, sanitize_stats, items) is True
+
+    def test_should_not_skip_when_parse_is_not_direct_json(self):
+        parse_meta = {"parse_mode": "object_block"}
+        sanitize_stats = {
+            "raw_items": 2,
+            "kept_items": 2,
+            "dropped_items": 0,
+            "coerced_prices": 0,
+            "trimmed_names": 0,
+            "total_delta": 0.0,
+        }
+        items = [{"name": "Burger", "price": 10.0}, {"name": "Tax", "price": 1.0}]
+        assert self.service._should_skip_correction(parse_meta, sanitize_stats, items) is False
+
+    def test_correction_worse_when_total_explodes(self):
+        extracted = [{"name": "Burger", "price": 100.0}]
+        corrected = [{"name": "Burger", "price": 500.0}]
+        assert self.service._is_correction_worse(extracted, corrected, {}, {}) is True
+
+    def test_correction_not_worse_for_small_changes(self):
+        extracted = [{"name": "Burger", "price": 100.0}, {"name": "Tax", "price": 10.0}]
+        corrected = [{"name": "Burger", "price": 98.0}, {"name": "Tax", "price": 10.0}]
+        assert self.service._is_correction_worse(extracted, corrected, {}, {}) is False
+
+    def test_sanitize_items_drops_non_finite_and_huge_values(self):
+        items = [
+            {"name": "Burger", "price": 120.0},
+            {"name": "Broken", "price": float("inf")},
+            {"name": "Huge", "price": "999999999999"},
+        ]
+        sanitized, stats = self.service._sanitize_items(items)
+        assert sanitized == [{"name": "Burger", "price": 120.0}]
+        assert stats["dropped_items"] == 2
 
 
 class TestSplitCents:
