@@ -1,5 +1,6 @@
 import os
 import re
+import math
 import asyncio
 import tempfile
 import logging
@@ -10,7 +11,7 @@ from fastapi import FastAPI, UploadFile, File, HTTPException, Header, Request
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
-from typing import List
+from typing import List, Any, Dict
 from starlette.middleware.base import BaseHTTPMiddleware
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -42,6 +43,9 @@ from services.firebase import (
 MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10MB
 MAX_JSON_SIZE = 64 * 1024  # 64KB
 BILL_ID_PATTERN = re.compile(r"^[a-zA-Z0-9_-]{20,}$")
+MAX_ITEM_NAME_LENGTH = int(os.environ.get("MAX_ITEM_NAME_LENGTH", "200"))
+MAX_ITEM_ABS_PRICE = float(os.environ.get("MAX_ITEM_ABS_PRICE", "1000000"))
+MAX_BILL_TOTAL = float(os.environ.get("MAX_BILL_TOTAL", "10000000"))
 
 limiter = Limiter(key_func=get_remote_address)
 
@@ -207,6 +211,46 @@ def classify_item_type(name: str) -> str:
     return "item"
 
 
+def sanitize_ocr_items(raw_items: Any) -> List[Dict[str, Any]]:
+    """Enforce item schema and numeric sanity before bill processing/persistence."""
+    if not isinstance(raw_items, list):
+        return []
+
+    sanitized: List[Dict[str, Any]] = []
+    for raw in raw_items:
+        if not isinstance(raw, dict):
+            continue
+
+        name = str(raw.get("name", "")).strip()
+        if not name:
+            continue
+        if len(name) > MAX_ITEM_NAME_LENGTH:
+            name = name[:MAX_ITEM_NAME_LENGTH]
+
+        price_raw = raw.get("price")
+        if isinstance(price_raw, (int, float)):
+            price = float(price_raw)
+        elif isinstance(price_raw, str):
+            cleaned = price_raw.strip().replace(",", "")
+            if not cleaned:
+                continue
+            try:
+                price = float(cleaned)
+            except ValueError:
+                continue
+        else:
+            continue
+
+        if not math.isfinite(price):
+            continue
+        if abs(price) > MAX_ITEM_ABS_PRICE:
+            continue
+
+        sanitized.append({"name": name, "price": round(price, 2)})
+
+    return sanitized
+
+
 # ──────────────────────────────────────────────
 # Routes
 # ──────────────────────────────────────────────
@@ -287,7 +331,8 @@ async def extract_bill(request: Request, file: UploadFile = File(...)):
             if tmp_path and os.path.exists(tmp_path):
                 os.unlink(tmp_path)
 
-        items = ocr_result.get("items", []) if isinstance(ocr_result, dict) else (ocr_result if isinstance(ocr_result, list) else [])
+        raw_items = ocr_result.get("items", []) if isinstance(ocr_result, dict) else (ocr_result if isinstance(ocr_result, list) else [])
+        items = sanitize_ocr_items(raw_items)
         currency = ocr_result.get("currency", "") if isinstance(ocr_result, dict) else ""
         if not currency:
             currency = "INR"
@@ -325,6 +370,10 @@ async def extract_bill(request: Request, file: UploadFile = File(...)):
 
         if not total:
             total = sum(i.get("price", 0) or 0 for i in filtered_items)
+        if not math.isfinite(total) or abs(total) > MAX_BILL_TOTAL:
+            logger.warning("Computed total failed sanity check; falling back to sum(filtered_items)")
+            total = sum(i.get("price", 0) or 0 for i in filtered_items)
+        total = round(total, 2)
 
         share_url = ""
         bill_id = ""
@@ -332,7 +381,7 @@ async def extract_bill(request: Request, file: UploadFile = File(...)):
             bill_id = save_bill(
                 items=filtered_items,
                 currency=currency,
-                total=round(total, 2),
+                total=total,
             )
             share_url = f"/bill/{bill_id}"
         except Exception as e:
@@ -343,7 +392,7 @@ async def extract_bill(request: Request, file: UploadFile = File(...)):
                 "success": True,
                 "items": filtered_items,
                 "currency": currency,
-                "total": round(total, 2),
+                "total": total,
                 "bill_id": bill_id,
                 "share_url": share_url,
             }
