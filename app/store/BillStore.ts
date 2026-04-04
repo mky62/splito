@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import type { SplitResponse } from '../types/api';
 
 export interface BillItem {
   id: string;
@@ -34,13 +35,7 @@ export interface BillState {
     shareLink: string;
     generatingLink: boolean;
   };
-  splitResults: {
-    allSubmitted: boolean;
-    numSubmitted: number;
-    expectedUsers: number;
-    users: UserSelection[];
-    results: SplitResult[];
-  };
+  splitResults: SplitResponse;
   ui: {
     loading: boolean;
     extracting: boolean;
@@ -81,10 +76,12 @@ const initialState: BillState = {
   },
   splitResults: {
     allSubmitted: false,
+    currency: '',
     numSubmitted: 0,
     expectedUsers: 0,
-    users: [],
-    results: [],
+    users: {},
+    items: [],
+    total: 0,
   },
   ui: {
     loading: false,

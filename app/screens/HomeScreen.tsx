@@ -81,6 +81,8 @@ export default function HomeScreen() {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <ArrowLeft size={24} color="#3B82F6" />
         </TouchableOpacity>
+        <Text style={styles.headerTitle}>Scan Bill</Text>
+        <View style={styles.placeholder} />
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
@@ -104,7 +106,10 @@ export default function HomeScreen() {
             {loading ? (
               <ActivityIndicator color="#FFFFFF" size={20} />
             ) : (
-              <Camera size={24} color="#FFFFFF" />
+              <>
+                <Camera size={24} color="#FFFFFF" />
+                <Text style={styles.buttonText}>Take Photo</Text>
+              </>
             )}
           </TouchableOpacity>
         </View>
@@ -202,4 +207,3 @@ instructionText: {
     width: 40,
   },
 });
-

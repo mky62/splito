@@ -7,6 +7,8 @@ interface SplitSettingsProps {
   generatingLink: boolean;
   onTotalPeopleChange: (value: number) => void;
   onGenerateLink: () => void;
+  disabled?: boolean;
+  helperText?: string;
 }
 
 export const SplitSettings: React.FC<SplitSettingsProps> = ({
@@ -14,7 +16,11 @@ export const SplitSettings: React.FC<SplitSettingsProps> = ({
   generatingLink,
   onTotalPeopleChange,
   onGenerateLink,
+  disabled = false,
+  helperText,
 }) => {
+  const isButtonDisabled = generatingLink || disabled;
+
   return (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
@@ -53,9 +59,9 @@ export const SplitSettings: React.FC<SplitSettingsProps> = ({
       </View>
 
       <TouchableOpacity
-        style={[styles.generateBtn, generatingLink && styles.generateBtnDisabled]}
+        style={[styles.generateBtn, isButtonDisabled && styles.generateBtnDisabled]}
         onPress={onGenerateLink}
-        disabled={generatingLink}
+        disabled={isButtonDisabled}
         activeOpacity={0.8}
       >
         {generatingLink ? (
@@ -67,6 +73,8 @@ export const SplitSettings: React.FC<SplitSettingsProps> = ({
           </>
         )}
       </TouchableOpacity>
+
+      {helperText ? <Text style={styles.helperText}>{helperText}</Text> : null}
     </View>
   );
 };
@@ -167,5 +175,11 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 15,
     fontFamily: 'Saira_600SemiBold',
+  },
+  helperText: {
+    marginTop: 10,
+    fontSize: 13,
+    fontFamily: 'Saira_500Medium',
+    color: '#DC2626',
   },
 });

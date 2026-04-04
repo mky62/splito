@@ -1,4 +1,4 @@
-import { Platform } from 'react-native';
+import { NativeModules, Platform } from 'react-native';
 import type {
   BillItem,
   ExtractResponse,
@@ -27,16 +27,43 @@ export type {
   SetPeopleRequest,
 };
 
-const resolveApiBaseUrl = (): string => {
-  const envUrl = process.env.EXPO_PUBLIC_API_BASE;
-  if (envUrl) return envUrl;
-  if (__DEV__) {
-    return 'http://192.168.29.251:8000';
+const trimTrailingSlash = (url: string): string => url.replace(/\/+$/, '');
+const DEFAULT_REMOTE_API_BASE = 'https://splito-3ghi.onrender.com';
+
+const getMetroHost = (): string | null => {
+  const sourceCodeModule = NativeModules.SourceCode as
+    | { scriptURL?: string }
+    | undefined;
+  const scriptURL = sourceCodeModule?.scriptURL;
+  if (!scriptURL) return null;
+
+  const match = scriptURL.match(/^https?:\/\/([^/:]+)(?::\d+)?\//i);
+  return match?.[1] ?? null;
+};
+
+const resolveDevApiBaseUrl = (): string => {
+  const metroHost = getMetroHost();
+  if (metroHost) {
+    return `http://${metroHost}:8000`;
   }
-  throw new Error(
-    'EXPO_PUBLIC_API_BASE environment variable is required in production builds. ' +
-    'Set it to your backend URL (e.g., https://api.splito.app)'
-  );
+
+  // Fallbacks when scriptURL is unavailable (very early startup edge cases).
+  return Platform.OS === 'android'
+    ? 'http://10.0.2.2:8000'
+    : 'http://localhost:8000';
+};
+
+const resolveApiBaseUrl = (): string => {
+  const envUrl = process.env.EXPO_PUBLIC_API_BASE?.trim();
+  if (envUrl) return trimTrailingSlash(envUrl);
+  if (__DEV__) {
+    // Opt into local backend only when explicitly requested.
+    if (process.env.EXPO_PUBLIC_USE_LOCAL_API === 'true') {
+      return resolveDevApiBaseUrl();
+    }
+    return DEFAULT_REMOTE_API_BASE;
+  }
+  return DEFAULT_REMOTE_API_BASE;
 };
 
 const API_BASE = resolveApiBaseUrl();
@@ -49,6 +76,54 @@ async function handleResponse<T>(response: Response): Promise<T> {
     throw new Error(errorData.detail || `HTTP error ${response.status}`);
   }
   return response.json();
+}
+
+async function fetchWithNetworkHint(
+  path: string,
+  init?: RequestInit,
+): Promise<Response> {
+  try {
+    return await fetch(`${API_BASE}${path}`, init);
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : 'Network request failed';
+
+    if (message.includes('Network request failed') || message.includes('Failed to fetch')) {
+      const isLocalApi =
+        API_BASE.includes('localhost') ||
+        API_BASE.includes('127.0.0.1') ||
+        API_BASE.includes('10.0.2.2') ||
+        API_BASE.includes('192.168.') ||
+        API_BASE.includes('172.16.') ||
+        API_BASE.includes('172.17.') ||
+        API_BASE.includes('172.18.') ||
+        API_BASE.includes('172.19.') ||
+        API_BASE.includes('172.20.') ||
+        API_BASE.includes('172.21.') ||
+        API_BASE.includes('172.22.') ||
+        API_BASE.includes('172.23.') ||
+        API_BASE.includes('172.24.') ||
+        API_BASE.includes('172.25.') ||
+        API_BASE.includes('172.26.') ||
+        API_BASE.includes('172.27.') ||
+        API_BASE.includes('172.28.') ||
+        API_BASE.includes('172.29.') ||
+        API_BASE.includes('172.30.') ||
+        API_BASE.includes('172.31.');
+
+      const guidance = __DEV__
+        ? isLocalApi
+          ? `Cannot connect to backend at ${API_BASE}. ` +
+            `Make sure backend is running on port 8000. ` +
+            `For Android USB device run: adb reverse tcp:8000 tcp:8000`
+          : `Cannot connect to backend at ${API_BASE}. ` +
+            `Check internet connection and verify the server is up.`
+        : 'Cannot connect to backend service.';
+      throw new Error(guidance);
+    }
+
+    throw error;
+  }
 }
 
 // API Functions
@@ -71,7 +146,7 @@ export async function extractBill(imageUri: string): Promise<ExtractResponse> {
   const timeoutId = setTimeout(() => controller.abort(), 120000);
 
   try {
-    const response = await fetch(`${API_BASE}/extract-bill`, {
+    const response = await fetchWithNetworkHint('/extract-bill', {
       method: 'POST',
       body: formData,
       // Let fetch set Content-Type with boundary automatically for FormData
@@ -85,12 +160,12 @@ export async function extractBill(imageUri: string): Promise<ExtractResponse> {
 }
 
 export async function getBillData(billId: string): Promise<BillData> {
-  const response = await fetch(`${API_BASE}/api/bill/${billId}`);
+  const response = await fetchWithNetworkHint(`/api/bill/${billId}`);
   return handleResponse<BillData>(response);
 }
 
 export async function joinBill(billId: string, data: JoinRequest): Promise<JoinResponse> {
-  const response = await fetch(`${API_BASE}/api/bill/${billId}/join`, {
+  const response = await fetchWithNetworkHint(`/api/bill/${billId}/join`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
@@ -99,7 +174,7 @@ export async function joinBill(billId: string, data: JoinRequest): Promise<JoinR
 }
 
 export async function submitSelection(billId: string, data: SelectRequest): Promise<void> {
-  const response = await fetch(`${API_BASE}/api/bill/${billId}/select`, {
+  const response = await fetchWithNetworkHint(`/api/bill/${billId}/select`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
@@ -108,17 +183,17 @@ export async function submitSelection(billId: string, data: SelectRequest): Prom
 }
 
 export async function getSplitResults(billId: string): Promise<SplitResponse> {
-  const response = await fetch(`${API_BASE}/api/bill/${billId}/split`);
+  const response = await fetchWithNetworkHint(`/api/bill/${billId}/split`);
   return handleResponse<SplitResponse>(response);
 }
 
 export async function getBillStatus(billId: string): Promise<StatusResponse> {
-  const response = await fetch(`${API_BASE}/api/bill/${billId}/status`);
+  const response = await fetchWithNetworkHint(`/api/bill/${billId}/status`);
   return handleResponse<StatusResponse>(response);
 }
 
 export async function setExpectedPeople(billId: string, data: SetPeopleRequest): Promise<void> {
-  const response = await fetch(`${API_BASE}/api/bill/${billId}/set-people`, {
+  const response = await fetchWithNetworkHint(`/api/bill/${billId}/set-people`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
@@ -127,7 +202,7 @@ export async function setExpectedPeople(billId: string, data: SetPeopleRequest):
 }
 
 export async function getSelections(billId: string): Promise<SelectionsResponse> {
-  const response = await fetch(`${API_BASE}/api/bill/${billId}/selections`);
+  const response = await fetchWithNetworkHint(`/api/bill/${billId}/selections`);
   return handleResponse<SelectionsResponse>(response);
 }
 

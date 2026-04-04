@@ -91,9 +91,12 @@ const BillScanScreen: React.FC<BillScanScreenProps> = ({ route, navigation }) =>
       const data = await getSplitResults(billId);
       updateSplitResults({
         allSubmitted: data.allSubmitted,
+        currency: data.currency || '',
         numSubmitted: data.numSubmitted || 0,
         expectedUsers: data.expectedUsers || 0,
-        users: (data.users as any) || {},
+        users: data.users || {},
+        items: data.items || [],
+        total: data.total || 0,
       });
     } catch {
       // Silently ignore poll errors — next poll will retry
@@ -107,7 +110,10 @@ const BillScanScreen: React.FC<BillScanScreenProps> = ({ route, navigation }) =>
   }, [pollSplit]);
 
   const generateLink = useCallback(async () => {
-    if (!currentBill.billId) return;
+    if (!currentBill.billId) {
+      Alert.alert('Missing bill ID', "Couldn't create bill ID. Please extract again.");
+      return;
+    }
 
     setLinkGenerating(true);
     try {
@@ -130,6 +136,8 @@ const BillScanScreen: React.FC<BillScanScreenProps> = ({ route, navigation }) =>
       }
     };
   }, []);
+
+  const canGenerateLink = Boolean(currentBill.billId) && !splitSettings.generatingLink;
 
   return (
     <View style={styles.container}>
@@ -192,12 +200,14 @@ const BillScanScreen: React.FC<BillScanScreenProps> = ({ route, navigation }) =>
           />
         )}
 
-        {currentBill.billId && !splitSettings.linkGenerated && (
+        {currentBill.items.length > 0 && !splitSettings.linkGenerated && (
           <SplitSettings
             totalPeople={splitSettings.totalPeople}
             generatingLink={splitSettings.generatingLink}
             onTotalPeopleChange={setTotalPeople}
             onGenerateLink={generateLink}
+            disabled={!canGenerateLink}
+            helperText={!currentBill.billId ? "Couldn't create bill ID. Please extract again." : undefined}
           />
         )}
 
@@ -206,7 +216,7 @@ const BillScanScreen: React.FC<BillScanScreenProps> = ({ route, navigation }) =>
         )}
 
         {splitSettings.linkGenerated && (splitResults.expectedUsers > 0 || splitResults.numSubmitted > 0 || splitResults.allSubmitted) && (
-          <SplitResults splitData={splitResults as any} />
+          <SplitResults splitData={splitResults} />
         )}
       </ScrollView>
     </View>
