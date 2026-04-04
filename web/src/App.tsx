@@ -3,7 +3,7 @@ import './App.css'
 import welcomeImage from './assets/wlsc.jpg'
 import {
   extractBill,
-  getApiBaseUrl,
+  getPublicShareBaseUrl,
   getSplitResults,
   setExpectedPeople,
 } from './lib/api'
@@ -39,6 +39,18 @@ function App() {
   const cameraInputRef = useRef<HTMLInputElement | null>(null)
   const galleryInputRef = useRef<HTMLInputElement | null>(null)
   const copiedTimerRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    const { pathname, search, hash, origin } = window.location
+    const publicShareBase = getPublicShareBaseUrl()
+
+    if (
+      pathname.startsWith('/bill/') &&
+      !publicShareBase.startsWith(origin)
+    ) {
+      window.location.replace(`${publicShareBase}${pathname}${search}${hash}`)
+    }
+  }, [])
 
   useEffect(() => {
     if (!shareLink || !billId) {
@@ -219,7 +231,7 @@ function App() {
 
     try {
       await setExpectedPeople(billId, { totalPeople })
-      setShareLink(`${getApiBaseUrl()}/bill/${billId}`)
+      setShareLink(`${getPublicShareBaseUrl()}/bill/${billId}`)
     } catch (err) {
       const message =
         err instanceof Error ? err.message : 'Failed to generate share link.'

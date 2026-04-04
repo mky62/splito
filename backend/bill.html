@@ -680,9 +680,36 @@
         const selectSection = document.getElementById('selectSection');
         const resultsSection = document.getElementById('resultsSection');
 
+        function getStorageKey(suffix) {
+            return 'bill_' + billId + '_' + suffix;
+        }
+
+        function safeStorageGet(key) {
+            try {
+                return window.localStorage.getItem(key);
+            } catch (err) {
+                console.warn('Storage read failed:', err);
+                return null;
+            }
+        }
+
+        function safeStorageSet(key, value) {
+            try {
+                window.localStorage.setItem(key, value);
+            } catch (err) {
+                console.warn('Storage write failed:', err);
+            }
+        }
+
+        function showErrorState(message) {
+            loading.classList.add('hidden');
+            errorDiv.classList.remove('hidden');
+            document.getElementById('errorMessage').textContent = message || 'Something went wrong';
+        }
+
         let billData = null;
-        let userId = localStorage.getItem('bill_' + billId + '_userId') || null;
-        let userName = localStorage.getItem('bill_' + billId + '_userName') || '';
+        let userId = safeStorageGet(getStorageKey('userId')) || null;
+        let userName = safeStorageGet(getStorageKey('userName')) || '';
         let hasSubmitted = false;
         let pollInterval = null;
         let expectedUsers = 0;
@@ -731,7 +758,21 @@
         }
 
         async function fetchApiJson(url, options, fallbackMessage) {
-            const res = await fetch(url, options);
+            const controller = new AbortController();
+            const timeoutId = window.setTimeout(() => controller.abort(), 15000);
+
+            let res;
+            try {
+                res = await fetch(url, { ...(options || {}), signal: controller.signal });
+            } catch (err) {
+                window.clearTimeout(timeoutId);
+                if (err instanceof DOMException && err.name === 'AbortError') {
+                    throw new Error('Request timed out. Please try again.');
+                }
+                throw err;
+            }
+
+            window.clearTimeout(timeoutId);
             const payload = await readResponsePayload(res);
 
             if (!res.ok) {
@@ -755,43 +796,51 @@
             mainContent.classList.remove('hidden');
         }
 
+        async function restoreExistingUserState() {
+            try {
+                const statusData = await fetchApiJson('/api/bill/' + billId + '/status', undefined, 'Failed to load bill status');
+
+                if (statusData.allSubmitted) {
+                    selectSection.classList.add('hidden');
+                    joinSection.classList.add('hidden');
+                    await showResults();
+                    return;
+                }
+
+                const selData = await fetchApiJson('/api/bill/' + billId + '/selections', undefined, 'Failed to load participants');
+                const mySelection = selData.selections?.find(s => s.userId === userId);
+
+                if (mySelection && mySelection.items && mySelection.items.length > 0) {
+                    hasSubmitted = true;
+                    selectSection.classList.add('hidden');
+                    showWaitingState();
+                } else {
+                    showSelectSection();
+                    loadParticipants();
+                }
+            } catch (err) {
+                console.error('Failed to restore bill state:', err);
+                showSelectSection();
+                loadParticipants();
+            }
+        }
+
         async function loadBill() {
             try {
                 if (initialBillData) applyBillData(initialBillData);
                 else applyBillData(await fetchApiJson('/api/bill/' + billId, undefined, 'Failed to load bill'));
 
                 if (userId) {
-                    try {
-                        const statusData = await fetchApiJson('/api/bill/' + billId + '/status', undefined, 'Failed to load bill status');
-
-                        if (statusData.allSubmitted) {
-                            await showResults();
-                        } else {
-                            const selData = await fetchApiJson('/api/bill/' + billId + '/selections', undefined, 'Failed to load participants');
-                            const mySelection = selData.selections?.find(s => s.userId === userId);
-
-                            if (mySelection && mySelection.items && mySelection.items.length > 0) {
-                                hasSubmitted = true;
-                                showWaitingState();
-                            } else {
-                                showSelectSection();
-                                loadParticipants();
-                            }
-                        }
-                    } catch (err) {
-                        console.error('Failed to restore bill state:', err);
-                        showSelectSection();
-                        loadParticipants();
-                    }
+                    showSelectSection();
+                    loadParticipants();
+                    restoreExistingUserState();
                 } else {
                     document.getElementById('nameInput').value = userName;
                     joinSection.classList.remove('hidden');
                     loadParticipants();
                 }
             } catch (err) {
-                loading.classList.add('hidden');
-                errorDiv.classList.remove('hidden');
-                document.getElementById('errorMessage').textContent = err.message || 'Failed to load bill';
+                showErrorState(err.message || 'Failed to load bill');
             }
         }
 
@@ -816,8 +865,8 @@
                 userId = data.userId;
                 userName = name;
 
-                localStorage.setItem('bill_' + billId + '_userId', userId);
-                localStorage.setItem('bill_' + billId + '_userName', userName);
+                safeStorageSet(getStorageKey('userId'), userId);
+                safeStorageSet(getStorageKey('userName'), userName);
 
                 joinSection.classList.add('hidden');
                 showSelectSection();

@@ -6,6 +6,22 @@ const trimTrailingSlash = (url: string) => url.replace(/\/+$/, '')
 
 const resolveDevApiBaseUrl = () => ''
 
+const resolvePublicShareBaseUrl = () => {
+  const envUrl = import.meta.env.VITE_PUBLIC_SHARE_BASE?.trim()
+
+  if (envUrl) {
+    return trimTrailingSlash(envUrl)
+  }
+
+  const apiEnvUrl = import.meta.env.VITE_API_BASE?.trim()
+
+  if (apiEnvUrl) {
+    return trimTrailingSlash(apiEnvUrl)
+  }
+
+  return DEFAULT_REMOTE_API_BASE
+}
+
 const resolveApiBaseUrl = () => {
   const envUrl = import.meta.env.VITE_API_BASE?.trim()
 
@@ -21,6 +37,7 @@ const resolveApiBaseUrl = () => {
 }
 
 const API_BASE = resolveApiBaseUrl()
+const PUBLIC_SHARE_BASE = resolvePublicShareBaseUrl()
 
 async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
@@ -94,4 +111,8 @@ export async function getSplitResults(billId: string): Promise<SplitResponse> {
 
 export function getApiBaseUrl() {
   return API_BASE
+}
+
+export function getPublicShareBaseUrl() {
+  return PUBLIC_SHARE_BASE
 }
