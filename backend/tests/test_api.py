@@ -58,6 +58,20 @@ class TestBillIdValidation:
             response = client.get("/api/bill/abc123def456ghi789jkl0")
             assert response.status_code == 404  # Not found, but validation passed
 
+    def test_bill_page_injects_initial_bill_data(self, client):
+        with patch("main.get_bill") as mock_get_bill:
+            mock_get_bill.return_value = {
+                "items": [{"name": "Burger", "price": 10.5, "type": "item"}],
+                "currency": "INR",
+                "total": 10.5,
+                "id": "abc123def456ghi789jkl0",
+            }
+            response = client.get("/bill/abc123def456ghi789jkl0")
+
+        assert response.status_code == 200
+        assert "window.__INITIAL_BILL_DATA__" in response.text
+        assert '"name": "Burger"' in response.text
+
 
 class TestBillApiErrorResponses:
     """Test unexpected /api/bill/* failures are returned as JSON."""

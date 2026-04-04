@@ -13,13 +13,14 @@ logger = logging.getLogger(__name__)
 
 _initialized = False
 _init_lock = threading.Lock()
+_db_client = None
 
 TAX_ITEM_TYPES = {"tax", "total", "subtotal", "net", "gratuity", "surcharge"}
 SPLIT_ACROSS_ALL_TYPES = TAX_ITEM_TYPES | {"discount"}
 
 
 def _get_db() -> firestore.firestore.Client:
-    global _initialized
+    global _initialized, _db_client
     if not _initialized:
         with _init_lock:
             if not _initialized:
@@ -40,8 +41,17 @@ def _get_db() -> firestore.firestore.Client:
                         )
                     cred = credentials.Certificate(cred_path)
                 firebase_admin.initialize_app(cred)
+                _db_client = firestore.client()
                 _initialized = True
-    return firestore.client()
+    if _db_client is None:
+        _db_client = firestore.client()
+    return _db_client
+
+
+def _normalize_utc_datetime(value: Any) -> Any:
+    if isinstance(value, datetime) and value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value
 
 
 def save_bill(
@@ -83,15 +93,16 @@ def get_bill(doc_id: str) -> Optional[Dict[str, Any]]:
 
     data = doc.to_dict()
 
-    expires_at = data.get("expiresAt")
+    expires_at = _normalize_utc_datetime(data.get("expiresAt"))
     if expires_at and datetime.now(timezone.utc) > expires_at:
         db.collection("bills").document(doc_id).delete()
         logger.info(f"Bill {doc_id} expired, deleted")
         return None
 
     for field in ("createdAt", "expiresAt"):
-        if field in data and isinstance(data[field], datetime):
-            data[field] = data[field].isoformat()
+        value = _normalize_utc_datetime(data.get(field))
+        if isinstance(value, datetime):
+            data[field] = value.isoformat()
 
     data["id"] = doc_id
     return data

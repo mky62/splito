@@ -667,7 +667,12 @@
     </div>
 
     <script>
+        window.__INITIAL_BILL_DATA__ = __INITIAL_BILL_DATA__;
+    </script>
+
+    <script>
         const billId = window.location.pathname.split('/').pop();
+        const initialBillData = window.__INITIAL_BILL_DATA__ || null;
         const loading = document.getElementById('loading');
         const errorDiv = document.getElementById('error');
         const mainContent = document.getElementById('mainContent');
@@ -739,33 +744,44 @@
             throw new Error('Received an invalid response from the server.');
         }
 
+        function applyBillData(data) {
+            billData = data;
+            loading.classList.add('hidden');
+
+            if (billData.expectedUsers) expectedUsers = billData.expectedUsers;
+            if (billData.currency && billData.currency.toLowerCase() === 'inr') currencySymbol = '₹';
+            else if (billData.currency) currencySymbol = billData.currency === 'USD' ? '$' : billData.currency;
+
+            mainContent.classList.remove('hidden');
+        }
+
         async function loadBill() {
             try {
-                billData = await fetchApiJson('/api/bill/' + billId, undefined, 'Failed to load bill');
-                loading.classList.add('hidden');
-
-                if (billData.expectedUsers) expectedUsers = billData.expectedUsers;
-                if (billData.currency && billData.currency.toLowerCase() === 'inr') currencySymbol = '₹';
-                else if (billData.currency) currencySymbol = billData.currency === 'USD' ? '$' : billData.currency;
-
-                mainContent.classList.remove('hidden');
+                if (initialBillData) applyBillData(initialBillData);
+                else applyBillData(await fetchApiJson('/api/bill/' + billId, undefined, 'Failed to load bill'));
 
                 if (userId) {
-                    const statusData = await fetchApiJson('/api/bill/' + billId + '/status', undefined, 'Failed to load bill status');
+                    try {
+                        const statusData = await fetchApiJson('/api/bill/' + billId + '/status', undefined, 'Failed to load bill status');
 
-                    if (statusData.allSubmitted) {
-                        await showResults();
-                    } else {
-                        const selData = await fetchApiJson('/api/bill/' + billId + '/selections', undefined, 'Failed to load participants');
-                        const mySelection = selData.selections?.find(s => s.userId === userId);
-
-                        if (mySelection && mySelection.items && mySelection.items.length > 0) {
-                            hasSubmitted = true;
-                            showWaitingState();
+                        if (statusData.allSubmitted) {
+                            await showResults();
                         } else {
-                            showSelectSection();
-                            loadParticipants();
+                            const selData = await fetchApiJson('/api/bill/' + billId + '/selections', undefined, 'Failed to load participants');
+                            const mySelection = selData.selections?.find(s => s.userId === userId);
+
+                            if (mySelection && mySelection.items && mySelection.items.length > 0) {
+                                hasSubmitted = true;
+                                showWaitingState();
+                            } else {
+                                showSelectSection();
+                                loadParticipants();
+                            }
                         }
+                    } catch (err) {
+                        console.error('Failed to restore bill state:', err);
+                        showSelectSection();
+                        loadParticipants();
                     }
                 } else {
                     document.getElementById('nameInput').value = userName;

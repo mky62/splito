@@ -1,6 +1,13 @@
 #!/bin/bash
+set -e
+
 if [ -f .env ]; then
   export $(grep -v '^#' .env | xargs)
 fi
-source venv/bin/activate
-uvicorn main:app --reload --host 0.0.0.0
+
+if [ -d venv ]; then
+  source venv/bin/activate
+fi
+
+PORT="${PORT:-8000}"
+exec uvicorn main:app --host 0.0.0.0 --port "$PORT"

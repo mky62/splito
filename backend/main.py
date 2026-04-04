@@ -1,4 +1,5 @@
 import os
+import json
 import re
 import math
 import asyncio
@@ -8,7 +9,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, UploadFile, File, HTTPException, Header, Request
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import JSONResponse, FileResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import List, Any, Dict
@@ -300,7 +301,15 @@ async def serve_bill_js():
 @app.get("/bill/{bill_id}")
 def serve_bill_page(bill_id: str):
     validate_bill_id(bill_id)
-    return FileResponse("bill.html")
+    data = get_bill(bill_id)
+    if not data:
+        raise HTTPException(status_code=404, detail="Bill not found or expired")
+
+    bill_html = Path("bill.html").read_text(encoding="utf-8")
+    initial_bill_json = json.dumps(data).replace("</", "<\\/")
+    return HTMLResponse(
+        content=bill_html.replace("__INITIAL_BILL_DATA__", initial_bill_json),
+    )
 
 
 @app.get("/api/bill/{bill_id}")
