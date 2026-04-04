@@ -9,7 +9,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, UploadFile, File, HTTPException, Header, Request
-from fastapi.responses import JSONResponse, FileResponse, HTMLResponse
+from fastapi.responses import JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import List, Any, Dict
@@ -18,7 +18,6 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
-# Load environment variables from .env file
 env_path = Path(__file__).parent / ".env"
 load_dotenv(env_path)
 
@@ -47,6 +46,7 @@ BILL_ID_PATTERN = re.compile(r"^[a-zA-Z0-9_-]{20,}$")
 MAX_ITEM_NAME_LENGTH = int(os.environ.get("MAX_ITEM_NAME_LENGTH", "200"))
 MAX_ITEM_ABS_PRICE = float(os.environ.get("MAX_ITEM_ABS_PRICE", "1000000"))
 MAX_BILL_TOTAL = float(os.environ.get("MAX_BILL_TOTAL", "10000000"))
+PUBLIC_SHARE_BASE = os.environ.get("PUBLIC_SHARE_BASE", "https://splito-zeta.vercel.app").rstrip("/")
 
 limiter = Limiter(key_func=get_remote_address)
 
@@ -319,15 +319,7 @@ async def serve_bill_js():
 @app.get("/bill/{bill_id}")
 def serve_bill_page(bill_id: str):
     validate_bill_id(bill_id)
-    data = get_bill(bill_id)
-    if not data:
-        raise HTTPException(status_code=404, detail="Bill not found or expired")
-
-    bill_html = Path("bill.html").read_text(encoding="utf-8")
-    initial_bill_json = json.dumps(data).replace("</", "<\\/")
-    return HTMLResponse(
-        content=bill_html.replace("__INITIAL_BILL_DATA__", initial_bill_json),
-    )
+    raise HTTPException(status_code=404, detail="Shared bill page is hosted on the web frontend")
 
 
 @app.get("/api/bill/{bill_id}")
@@ -442,7 +434,7 @@ async def extract_bill(request: Request, file: UploadFile = File(...)):
                 currency=currency,
                 total=total,
             )
-            share_url = f"/bill/{bill_id}"
+            share_url = f"{PUBLIC_SHARE_BASE}/bill/{bill_id}"
         except Exception as e:
             logging.error(f"Firebase save failed: {e}")
 

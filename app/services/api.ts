@@ -29,6 +29,7 @@ export type {
 
 const trimTrailingSlash = (url: string): string => url.replace(/\/+$/, '');
 const DEFAULT_REMOTE_API_BASE = 'https://splito-3ghi.onrender.com';
+const DEFAULT_PUBLIC_SHARE_BASE = 'https://splito-zeta.vercel.app';
 
 const getMetroHost = (): string | null => {
   const sourceCodeModule = NativeModules.SourceCode as
@@ -67,6 +68,9 @@ const resolveApiBaseUrl = (): string => {
 };
 
 const API_BASE = resolveApiBaseUrl();
+const PUBLIC_SHARE_BASE = trimTrailingSlash(
+  process.env.EXPO_PUBLIC_SHARE_BASE?.trim() || DEFAULT_PUBLIC_SHARE_BASE,
+);
 console.log('[API] Backend URL:', API_BASE);
 
 // Helper for handling responses
@@ -207,7 +211,7 @@ export async function getSelections(billId: string): Promise<SelectionsResponse>
 }
 
 export function getShareUrl(billId: string): string {
-  return `${API_BASE}/bill/${billId}`;
+  return `${PUBLIC_SHARE_BASE}/bill/${billId}`;
 }
 
 export function getApiBaseUrl(): string {

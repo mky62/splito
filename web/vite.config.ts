@@ -20,11 +20,6 @@ export default defineConfig({
         changeOrigin: true,
         secure: true,
       },
-      '/bill': {
-        target: remoteApiBase,
-        changeOrigin: true,
-        secure: true,
-      },
     },
   },
 })

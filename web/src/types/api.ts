@@ -17,6 +17,49 @@ export interface ExtractResponse {
   share_url: string
 }
 
+export interface BillData {
+  id: string
+  restaurant: string
+  total: number
+  currency: string
+  items: BillItem[]
+  expectedUsers: number
+  expiresAt: string
+  taxTotal: number
+}
+
+export interface JoinRequest {
+  userName: string
+  totalPeople: number
+}
+
+export interface JoinResponse {
+  userId: string
+  userName: string
+}
+
+export interface SelectRequest {
+  userId: string
+  userName: string
+  items: number[]
+}
+
+export interface StatusResponse {
+  numSubmitted: number
+  expectedUsers: number
+  allSubmitted: boolean
+}
+
+export interface Selection {
+  userId: string
+  userName: string
+  items: number[]
+}
+
+export interface SelectionsResponse {
+  selections: Selection[]
+}
+
 export interface UserSplit {
   name: string
   total: number

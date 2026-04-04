@@ -3,7 +3,7 @@ import { File, X, ArrowLeft, Receipt } from 'lucide-react-native';
 import React, { useEffect, useCallback } from "react";
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../types/navigation';
-import { setExpectedPeople, getApiBaseUrl, extractBill } from '../services/api';
+import { setExpectedPeople, getShareUrl, extractBill } from '../services/api';
 import { useBillStore } from '../store/BillStore';
 import { ItemEditor } from '../components/bill/ItemEditor';
 import { SplitSettings } from '../components/bill/SplitSettings';
@@ -118,7 +118,7 @@ const BillScanScreen: React.FC<BillScanScreenProps> = ({ route, navigation }) =>
     setLinkGenerating(true);
     try {
       await setExpectedPeople(currentBill.billId, { totalPeople: splitSettings.totalPeople });
-      const fullShareUrl = `${getApiBaseUrl()}/bill/${currentBill.billId}`;
+      const fullShareUrl = getShareUrl(currentBill.billId);
       setLinkGenerated(fullShareUrl);
       startSplitPolling(currentBill.billId);
     } catch {
