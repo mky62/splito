@@ -162,18 +162,32 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 app.add_middleware(RequestLoggingMiddleware)
 
 # CORS middleware - restrictive origins for production
-ALLOWED_ORIGINS = os.environ.get("ALLOWED_ORIGINS", "").split(",") if os.environ.get("ALLOWED_ORIGINS") else [
+DEFAULT_ALLOWED_ORIGINS = [
     "http://localhost",
     "http://localhost:8081",
     "http://localhost:3000",
     "http://localhost:5173",
     "http://127.0.0.1:5173",
     "http://127.0.0.1:3000",
+    "https://splito-zeta.vercel.app",
 ]
+
+
+def _parse_allowed_origins() -> list[str]:
+    raw_origins = os.environ.get("ALLOWED_ORIGINS", "")
+    if not raw_origins.strip():
+        return DEFAULT_ALLOWED_ORIGINS
+
+    return [origin.strip() for origin in raw_origins.split(",") if origin.strip()]
+
+
+ALLOWED_ORIGINS = _parse_allowed_origins()
+ALLOWED_ORIGIN_REGEX = os.environ.get("ALLOWED_ORIGIN_REGEX", "").strip() or None
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
+    allow_origin_regex=ALLOWED_ORIGIN_REGEX,
     allow_credentials=True,
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization"],
