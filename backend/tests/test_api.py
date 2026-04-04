@@ -59,6 +59,18 @@ class TestBillIdValidation:
             assert response.status_code == 404  # Not found, but validation passed
 
 
+class TestBillApiErrorResponses:
+    """Test unexpected /api/bill/* failures are returned as JSON."""
+
+    def test_get_bill_unexpected_error_returns_json_500(self, client):
+        with patch("main.get_bill", side_effect=RuntimeError("firestore unavailable")):
+            response = client.get("/api/bill/abc123def456ghi789jkl0")
+
+        assert response.status_code == 500
+        assert response.headers["content-type"].startswith("application/json")
+        assert response.json() == {"detail": "Failed to load bill. Please try again."}
+
+
 class TestSecurityHeaders:
     """Test security headers are present."""
 

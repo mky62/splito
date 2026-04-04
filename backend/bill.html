@@ -684,14 +684,64 @@
         let selectedItems = new Set();
         let currencySymbol = '₹';
 
+        async function readResponsePayload(res) {
+            const contentType = (res.headers.get('content-type') || '').toLowerCase();
+            const raw = await res.text();
+
+            if (!raw) return null;
+
+            if (contentType.includes('application/json')) {
+                try {
+                    return JSON.parse(raw);
+                } catch (err) {
+                    if (res.ok) {
+                        throw new Error('Received an invalid response from the server.');
+                    }
+                    return raw.trim();
+                }
+            }
+
+            try {
+                return JSON.parse(raw);
+            } catch (err) {
+                return raw.trim();
+            }
+        }
+
+        function getApiErrorMessage(payload, fallbackMessage) {
+            if (payload && typeof payload === 'object') {
+                if (typeof payload.detail === 'string' && payload.detail.trim()) {
+                    return payload.detail.trim();
+                }
+                if (typeof payload.message === 'string' && payload.message.trim()) {
+                    return payload.message.trim();
+                }
+            }
+
+            if (typeof payload === 'string' && payload.trim()) {
+                return payload.trim();
+            }
+
+            return fallbackMessage;
+        }
+
+        async function fetchApiJson(url, options, fallbackMessage) {
+            const res = await fetch(url, options);
+            const payload = await readResponsePayload(res);
+
+            if (!res.ok) {
+                throw new Error(getApiErrorMessage(payload, fallbackMessage));
+            }
+
+            if (payload === null) return null;
+            if (payload && typeof payload === 'object') return payload;
+
+            throw new Error('Received an invalid response from the server.');
+        }
+
         async function loadBill() {
             try {
-                const res = await fetch('/api/bill/' + billId);
-                if (!res.ok) {
-                    const data = await res.json();
-                    throw new Error(data.detail || 'Bill not found');
-                }
-                billData = await res.json();
+                billData = await fetchApiJson('/api/bill/' + billId, undefined, 'Failed to load bill');
                 loading.classList.add('hidden');
 
                 if (billData.expectedUsers) expectedUsers = billData.expectedUsers;
@@ -701,14 +751,12 @@
                 mainContent.classList.remove('hidden');
 
                 if (userId) {
-                    const statusRes = await fetch('/api/bill/' + billId + '/status');
-                    const statusData = await statusRes.json();
+                    const statusData = await fetchApiJson('/api/bill/' + billId + '/status', undefined, 'Failed to load bill status');
 
                     if (statusData.allSubmitted) {
                         await showResults();
                     } else {
-                        const selRes = await fetch('/api/bill/' + billId + '/selections');
-                        const selData = await selRes.json();
+                        const selData = await fetchApiJson('/api/bill/' + billId + '/selections', undefined, 'Failed to load participants');
                         const mySelection = selData.selections?.find(s => s.userId === userId);
 
                         if (mySelection && mySelection.items && mySelection.items.length > 0) {
@@ -744,15 +792,11 @@
             btn.innerHTML = '<span>Joining...</span>';
 
             try {
-                const res = await fetch('/api/bill/' + billId + '/join', {
+                const data = await fetchApiJson('/api/bill/' + billId + '/join', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ userName: name, totalPeople: expectedUsers }),
-                });
-
-                if (!res.ok) throw new Error('Failed to join');
-
-                const data = await res.json();
+                }, 'Failed to join bill');
                 userId = data.userId;
                 userName = name;
 
@@ -793,9 +837,7 @@
 
         async function loadParticipants() {
             try {
-                const res = await fetch('/api/bill/' + billId + '/selections');
-                if (!res.ok) return;
-                const data = await res.json();
+                const data = await fetchApiJson('/api/bill/' + billId + '/selections', undefined, 'Failed to load participants');
 
                 const container = document.getElementById('participants');
                 const countEl = document.getElementById('participantCount');
@@ -845,7 +887,7 @@
             btn.innerHTML = '<span>Submitting...</span>';
 
             try {
-                const res = await fetch('/api/bill/' + billId + '/select', {
+                await fetchApiJson('/api/bill/' + billId + '/select', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -853,9 +895,7 @@
                         userName: userName,
                         items: Array.from(selectedItems),
                     }),
-                });
-
-                if (!res.ok) throw new Error('Failed to submit');
+                }, 'Failed to submit selection');
 
                 hasSubmitted = true;
                 selectSection.classList.add('hidden');
@@ -877,9 +917,7 @@
 
         async function pollForCompletion() {
             try {
-                const res = await fetch('/api/bill/' + billId + '/status');
-                if (!res.ok) return;
-                const data = await res.json();
+                const data = await fetchApiJson('/api/bill/' + billId + '/status', undefined, 'Failed to load bill status');
 
                 const numSubmitted = data.numSubmitted || 0;
                 const expected = data.expectedUsers || expectedUsers;
@@ -905,9 +943,7 @@
 
         async function loadParticipantsForSubmitted() {
             try {
-                const res = await fetch('/api/bill/' + billId + '/selections');
-                if (!res.ok) return;
-                const data = await res.json();
+                const data = await fetchApiJson('/api/bill/' + billId + '/selections', undefined, 'Failed to load participants');
                 const container = document.getElementById('participantsSubmitted');
                 if (data.selections && data.selections.length > 0) {
                     container.innerHTML = data.selections
@@ -925,9 +961,7 @@
             resultsSection.classList.remove('hidden');
 
             try {
-                const res = await fetch('/api/bill/' + billId + '/split');
-                if (!res.ok) throw new Error('Failed to load split');
-                const split = await res.json();
+                const split = await fetchApiJson('/api/bill/' + billId + '/split', undefined, 'Failed to load split');
 
                 if (!split.allSubmitted) {
                     resultsSection.classList.add('hidden');

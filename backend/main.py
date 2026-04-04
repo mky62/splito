@@ -60,6 +60,13 @@ async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
         content={"detail": "Rate limit exceeded. Try again later."},
     )
 
+
+def _extract_bill_id_from_path(path: str) -> str | None:
+    parts = [part for part in path.split("/") if part]
+    if len(parts) >= 3 and parts[0] == "api" and parts[1] == "bill":
+        return parts[2]
+    return None
+
 # ──────────────────────────────────────────────
 # Security Middleware
 # ──────────────────────────────────────────────
@@ -67,6 +74,30 @@ async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
 MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10MB
 MAX_JSON_SIZE = 64 * 1024  # 64KB
 BILL_ID_PATTERN = re.compile(r"^[a-zA-Z0-9_-]{20,}$")
+
+
+class BillApiExceptionMiddleware(BaseHTTPMiddleware):
+    """Return JSON for unexpected /api/bill/* failures instead of plain text."""
+
+    async def dispatch(self, request, call_next):
+        try:
+            return await call_next(request)
+        except HTTPException:
+            raise
+        except Exception:
+            if request.url.path.startswith("/api/bill/"):
+                logger.exception(
+                    "Unexpected bill API error",
+                    extra={
+                        "path": request.url.path,
+                        "bill_id": _extract_bill_id_from_path(request.url.path),
+                    },
+                )
+                return JSONResponse(
+                    status_code=500,
+                    content={"detail": "Failed to load bill. Please try again."},
+                )
+            raise
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
@@ -115,6 +146,7 @@ def validate_bill_id(bill_id: str) -> None:
         raise HTTPException(status_code=400, detail="Invalid bill ID format")
 
 
+app.add_middleware(BillApiExceptionMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(BodySizeMiddleware)
 
