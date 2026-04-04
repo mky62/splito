@@ -245,17 +245,18 @@ TOTAL_PRIORITY = [
 
 def classify_item_type(name: str) -> str:
     lower_name = name.strip().lower()
+    normalized_name = re.sub(r"[^a-z0-9]+", " ", lower_name).strip()
 
     for keyword in DISCOUNT_KEYWORDS:
-        if keyword in lower_name:
+        if keyword in lower_name or keyword in normalized_name:
             return "discount"
 
     for keyword in TAX_KEYWORDS:
-        if keyword in lower_name:
+        if keyword in lower_name or keyword in normalized_name:
             return "tax"
 
     for keyword in CHARGE_KEYWORDS:
-        if keyword in lower_name:
+        if keyword in lower_name or keyword in normalized_name:
             return "tax"
 
     return "item"

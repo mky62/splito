@@ -1,6 +1,7 @@
 import os
 import json
 import logging
+import re
 import uuid
 import threading
 from datetime import datetime, timedelta, timezone
@@ -17,6 +18,39 @@ _db_client = None
 
 TAX_ITEM_TYPES = {"tax", "total", "subtotal", "net", "gratuity", "surcharge"}
 SPLIT_ACROSS_ALL_TYPES = TAX_ITEM_TYPES | {"discount"}
+LEGACY_TAX_KEYWORDS = ("tax", "cgst", "sgst", "igst", "vat", "gst", "service tax", "service charge", "gratuity", "surcharge")
+LEGACY_DISCOUNT_KEYWORDS = ("discount", "coupon", "promo", "offer", "bogo", "off")
+
+
+def _normalize_item_name(name: Any) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", str(name or "").strip().lower()).strip()
+
+
+def _resolve_item_type(item: Dict[str, Any]) -> str:
+    explicit_type = str(item.get("type") or "").strip().lower()
+    if explicit_type in SPLIT_ACROSS_ALL_TYPES or explicit_type == "item":
+        return explicit_type
+
+    normalized_name = _normalize_item_name(item.get("name"))
+
+    for keyword in LEGACY_DISCOUNT_KEYWORDS:
+        if keyword in normalized_name:
+            return "discount"
+
+    for keyword in LEGACY_TAX_KEYWORDS:
+        if keyword in normalized_name:
+            return "tax"
+
+    return "item"
+
+
+def _normalize_bill_items(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    normalized_items: List[Dict[str, Any]] = []
+    for item in items:
+        item_copy = dict(item)
+        item_copy["type"] = _resolve_item_type(item_copy)
+        normalized_items.append(item_copy)
+    return normalized_items
 
 
 def _get_db() -> firestore.firestore.Client:
@@ -65,7 +99,7 @@ def save_bill(
 
     tax_total = sum(
         item.get("price", 0) or 0
-        for item in items
+        for item in _normalize_bill_items(items)
         if item.get("type") in TAX_ITEM_TYPES
     )
 
@@ -92,6 +126,7 @@ def get_bill(doc_id: str) -> Optional[Dict[str, Any]]:
         return None
 
     data = doc.to_dict()
+    data["items"] = _normalize_bill_items(data.get("items", []))
 
     expires_at = _normalize_utc_datetime(data.get("expiresAt"))
     if expires_at and datetime.now(timezone.utc) > expires_at:
@@ -268,7 +303,7 @@ def calculate_split(bill_id: str) -> Optional[Dict[str, Any]]:
         return None
 
     bill_data = bill_doc.to_dict()
-    items = bill_data.get("items", [])
+    items = _normalize_bill_items(bill_data.get("items", []))
     currency = bill_data.get("currency", "")
     tax_total = bill_data.get("taxTotal", 0)
 
