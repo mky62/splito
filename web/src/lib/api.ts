@@ -4,10 +4,7 @@ const DEFAULT_REMOTE_API_BASE = 'https://splito-3ghi.onrender.com'
 
 const trimTrailingSlash = (url: string) => url.replace(/\/+$/, '')
 
-const resolveDevApiBaseUrl = () => {
-  const host = window.location.hostname || 'localhost'
-  return `http://${host}:8000`
-}
+const resolveDevApiBaseUrl = () => ''
 
 const resolveApiBaseUrl = () => {
   const envUrl = import.meta.env.VITE_API_BASE?.trim()
@@ -43,7 +40,7 @@ async function fetchWithNetworkHint(path: string, init?: RequestInit) {
 
     if (message.includes('Failed to fetch')) {
       throw new Error(
-        `Cannot connect to backend at ${API_BASE}. Check the server status or set VITE_API_BASE.`,
+        `Cannot connect to backend at ${API_BASE || 'the configured dev proxy'}. Check the server status or set VITE_API_BASE.`,
       )
     }
 
