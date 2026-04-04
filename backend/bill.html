@@ -666,13 +666,25 @@
         </div>
     </div>
 
-    <script>
-        window.__INITIAL_BILL_DATA__ = __INITIAL_BILL_DATA__;
-    </script>
+    <script id="initialBillData" type="application/json">__INITIAL_BILL_DATA__</script>
 
     <script>
         const billId = window.location.pathname.split('/').pop();
-        const initialBillData = window.__INITIAL_BILL_DATA__ || null;
+        function readInitialBillData() {
+            const node = document.getElementById('initialBillData');
+            const raw = node ? node.textContent : '';
+
+            if (!raw) return null;
+
+            try {
+                return JSON.parse(raw);
+            } catch (err) {
+                console.error('Failed to parse initial bill payload:', err);
+                return null;
+            }
+        }
+
+        const initialBillData = readInitialBillData();
         const loading = document.getElementById('loading');
         const errorDiv = document.getElementById('error');
         const mainContent = document.getElementById('mainContent');
