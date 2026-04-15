@@ -10,6 +10,12 @@ import type { LocalBillItem, SplitResponse } from '../types/api'
 
 type CreatorScreen = 'welcome' | 'home' | 'scan'
 
+interface ReceiptPart {
+  id: string
+  file: File
+  previewUrl: string
+}
+
 const initialResults: SplitResponse = {
   allSubmitted: false,
   currency: '',
@@ -22,8 +28,7 @@ const initialResults: SplitResponse = {
 
 function CreatorPage() {
   const [screen, setScreen] = useState<CreatorScreen>('welcome')
-  const [selectedFile, setSelectedFile] = useState<File | null>(null)
-  const [previewUrl, setPreviewUrl] = useState('')
+  const [receiptParts, setReceiptParts] = useState<ReceiptPart[]>([])
   const [billId, setBillId] = useState('')
   const [items, setItems] = useState<LocalBillItem[]>([])
   const [billTotal, setBillTotal] = useState<number | null>(null)
@@ -38,6 +43,8 @@ function CreatorPage() {
   const cameraInputRef = useRef<HTMLInputElement | null>(null)
   const galleryInputRef = useRef<HTMLInputElement | null>(null)
   const copiedTimerRef = useRef<number | null>(null)
+  const pendingReplacementPartIdRef = useRef<string | null>(null)
+  const receiptPartsRef = useRef<ReceiptPart[]>([])
 
   useEffect(() => {
     if (!shareLink || !billId) {
@@ -71,15 +78,17 @@ function CreatorPage() {
 
   useEffect(() => {
     return () => {
-      if (previewUrl) {
-        URL.revokeObjectURL(previewUrl)
-      }
+      receiptPartsRef.current.forEach((part) => URL.revokeObjectURL(part.previewUrl))
 
       if (copiedTimerRef.current) {
         window.clearTimeout(copiedTimerRef.current)
       }
     }
-  }, [previewUrl])
+  }, [])
+
+  useEffect(() => {
+    receiptPartsRef.current = receiptParts
+  }, [receiptParts])
 
   const resetBillState = () => {
     setBillId('')
@@ -95,57 +104,82 @@ function CreatorPage() {
 
   const handleBackToWelcome = () => {
     resetBillState()
-    setSelectedFile(null)
-
-    if (previewUrl) {
-      URL.revokeObjectURL(previewUrl)
-      setPreviewUrl('')
-    }
+    clearReceiptParts()
 
     setScreen('welcome')
   }
 
   const handleBackToHome = () => {
     resetBillState()
-    setSelectedFile(null)
-
-    if (previewUrl) {
-      URL.revokeObjectURL(previewUrl)
-      setPreviewUrl('')
-    }
+    clearReceiptParts()
 
     setScreen('home')
   }
 
-  const openCameraPicker = () => {
+  const clearReceiptParts = () => {
+    setReceiptParts((currentParts) => {
+      currentParts.forEach((part) => URL.revokeObjectURL(part.previewUrl))
+      return []
+    })
+    pendingReplacementPartIdRef.current = null
+  }
+
+  const openCameraPicker = (replacementPartId?: string) => {
+    pendingReplacementPartIdRef.current = replacementPartId ?? null
     cameraInputRef.current?.click()
   }
 
-  const openGalleryPicker = () => {
+  const openGalleryPicker = (replacementPartId?: string) => {
+    pendingReplacementPartIdRef.current = replacementPartId ?? null
     galleryInputRef.current?.click()
   }
 
   const handleFileSelected = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
+    const files = Array.from(event.target.files ?? [])
     event.target.value = ''
 
-    if (!file) {
+    if (!files.length) {
+      pendingReplacementPartIdRef.current = null
       return
     }
 
+    const replacementPartId = pendingReplacementPartIdRef.current
+    pendingReplacementPartIdRef.current = null
     resetBillState()
+    setReceiptParts((currentParts) => {
+      const newParts = files.map((file, index) => ({
+        id: `${Date.now()}-${index}`,
+        file,
+        previewUrl: URL.createObjectURL(file),
+      }))
 
-    if (previewUrl) {
-      URL.revokeObjectURL(previewUrl)
-    }
+      if (!replacementPartId) {
+        return [...currentParts, ...newParts]
+      }
 
-    setSelectedFile(file)
-    setPreviewUrl(URL.createObjectURL(file))
+      let didReplace = false
+      const updatedParts = currentParts.map((part) => {
+        if (part.id !== replacementPartId) {
+          return part
+        }
+
+        didReplace = true
+        URL.revokeObjectURL(part.previewUrl)
+        return newParts[0]
+      })
+
+      if (!didReplace) {
+        return [...currentParts, ...newParts]
+      }
+
+      newParts.slice(1).forEach((part) => URL.revokeObjectURL(part.previewUrl))
+      return updatedParts
+    })
     setScreen('scan')
   }
 
   const handleExtractItems = async () => {
-    if (!selectedFile || isProcessing) {
+    if (!receiptParts.length || isProcessing) {
       return
     }
 
@@ -153,7 +187,8 @@ function CreatorPage() {
     setError('')
 
     try {
-      const response = await extractBill(selectedFile)
+      const files = receiptParts.map((part) => part.file)
+      const response = await extractBill(files.length === 1 ? files[0] : files)
 
       setBillId(response.bill_id ?? '')
       setBillTotal(response.total ?? 0)
@@ -173,6 +208,23 @@ function CreatorPage() {
     } finally {
       setIsProcessing(false)
     }
+  }
+
+  const removeReceiptPart = (id: string) => {
+    resetBillState()
+    setReceiptParts((currentParts) => {
+      const partToRemove = currentParts.find((part) => part.id === id)
+      if (partToRemove) {
+        URL.revokeObjectURL(partToRemove.previewUrl)
+      }
+
+      const nextParts = currentParts.filter((part) => part.id !== id)
+      if (!nextParts.length) {
+        setScreen('home')
+      }
+
+      return nextParts
+    })
   }
 
   const updateItem = (
@@ -270,6 +322,7 @@ function CreatorPage() {
         className="sr-only"
         type="file"
         accept="image/*"
+        multiple
         onChange={handleFileSelected}
       />
 
@@ -336,7 +389,7 @@ function CreatorPage() {
               <button
                 className="home-action camera-action"
                 type="button"
-                onClick={openCameraPicker}
+                onClick={() => openCameraPicker()}
               >
                 <span>Take Photo</span>
                 <small>Best on mobile, opens your rear camera when available.</small>
@@ -344,7 +397,7 @@ function CreatorPage() {
               <button
                 className="home-action gallery-action"
                 type="button"
-                onClick={openGalleryPicker}
+                onClick={() => openGalleryPicker()}
               >
                 <span>Pick from Gallery</span>
                 <small>Use an existing receipt image from your laptop or phone.</small>
@@ -364,7 +417,7 @@ function CreatorPage() {
               <p className="eyebrow">Receipt workflow</p>
               <h1>Bill Scanner</h1>
             </div>
-            <button className="ghost-button" type="button" onClick={openGalleryPicker}>
+            <button className="ghost-button" type="button" onClick={() => openGalleryPicker()}>
               Choose another
             </button>
           </header>
@@ -376,10 +429,41 @@ function CreatorPage() {
                 <h2>Review the uploaded receipt</h2>
               </div>
 
-              {previewUrl ? (
-                <div className="receipt-preview">
-                  <img src={previewUrl} alt="Uploaded receipt preview" />
-                  <div className="receipt-chip">Ready for extraction</div>
+              {receiptParts.length ? (
+                <div className="receipt-preview-list">
+                  {receiptParts.map((part, index) => (
+                    <article className="receipt-preview-card" key={part.id}>
+                      <div className="receipt-preview">
+                        <img
+                          src={part.previewUrl}
+                          alt={`Uploaded receipt preview ${index + 1}`}
+                        />
+                        <div className="receipt-chip">
+                          {receiptParts.length > 1
+                            ? `Part ${index + 1}`
+                            : 'Ready for extraction'}
+                        </div>
+                      </div>
+                      <div className="receipt-part-actions">
+                        <button
+                          className="secondary-button"
+                          type="button"
+                          onClick={() => openGalleryPicker(part.id)}
+                        >
+                          Replace
+                        </button>
+                        {receiptParts.length > 1 ? (
+                          <button
+                            className="delete-button"
+                            type="button"
+                            onClick={() => removeReceiptPart(part.id)}
+                          >
+                            Remove
+                          </button>
+                        ) : null}
+                      </div>
+                    </article>
+                  ))}
                 </div>
               ) : null}
 
@@ -396,7 +480,12 @@ function CreatorPage() {
                       ? 'Items Extracted'
                       : 'Extract Items'}
                 </button>
-                <button className="secondary-button" type="button" onClick={openCameraPicker}>
+                <button
+                  className="secondary-button"
+                  type="button"
+                  onClick={() => openCameraPicker(receiptParts[0]?.id)}
+                  disabled={!receiptParts.length}
+                >
                   Retake
                 </button>
               </div>

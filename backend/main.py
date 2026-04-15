@@ -12,7 +12,7 @@ from fastapi import FastAPI, UploadFile, File, HTTPException, Header, Request
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
-from typing import List, Any, Dict
+from typing import List, Any, Dict, Optional
 from starlette.middleware.base import BaseHTTPMiddleware
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -302,6 +302,120 @@ def sanitize_ocr_items(raw_items: Any) -> List[Dict[str, Any]]:
     return sanitized
 
 
+async def read_image_upload(file: UploadFile) -> bytes:
+    content_type = file.content_type or ""
+    if not content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="File must be an image")
+
+    content = b""
+    while True:
+        chunk = await file.read(1024 * 1024)
+        if not chunk:
+            break
+        content += chunk
+        if len(content) > MAX_UPLOAD_SIZE:
+            raise HTTPException(
+                status_code=413,
+                detail="File too large. Maximum size is 10MB.",
+            )
+
+    return content
+
+
+def queue_cloudinary_upload(content: bytes, filename: str, index: int) -> None:
+    try:
+        upload_filename = f"{index + 1}-{filename or 'unknown'}"
+        task = asyncio.create_task(upload_to_cloudinary(content, upload_filename))
+        _background_tasks.add(task)
+        task.add_done_callback(_background_tasks.discard)
+    except Exception as e:
+        logger.warning(f"Cloudinary upload init failed: {e}")
+
+
+def run_ocr_for_upload(content: bytes, filename: str) -> Dict[str, Any]:
+    tmp_path = None
+    suffix = Path(filename or "receipt.jpg").suffix or ".jpg"
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+            tmp.write(content)
+            tmp_path = tmp.name
+
+        ocr_service = get_ocr_service()
+        return ocr_service.extract_items(tmp_path)
+    finally:
+        if tmp_path and os.path.exists(tmp_path):
+            os.unlink(tmp_path)
+
+
+def pick_summary_total(summary_items: List[Dict[str, Any]]) -> float:
+    for priority_name in TOTAL_PRIORITY:
+        for summary in summary_items:
+            if summary["name"] == priority_name:
+                return summary["price"]
+
+    return 0
+
+
+def build_bill_payload(ocr_results: List[Dict[str, Any]]) -> Dict[str, Any]:
+    currency = ""
+
+    for result in ocr_results:
+        if not isinstance(result, dict):
+            continue
+
+        if not currency:
+            currency = result.get("currency", "") or ""
+
+    if not currency:
+        currency = "INR"
+
+    filtered_items = []
+    all_summary_items: List[Dict[str, Any]] = []
+    final_section_summary_items: List[Dict[str, Any]] = []
+
+    for section_index, result in enumerate(ocr_results):
+        section_raw_items = result.get("items", []) if isinstance(result, dict) else []
+        section_items = sanitize_ocr_items(section_raw_items)
+        section_summary_items: List[Dict[str, Any]] = []
+
+        for item in section_items:
+            name = item.get("name", "").strip()
+            name_lower = name.lower()
+            item_type = classify_item_type(name)
+            item_price = item.get("price", 0) or 0
+
+            if name_lower in SUMMARY_NAMES:
+                summary = {"name": name_lower, "price": item_price}
+                section_summary_items.append(summary)
+                all_summary_items.append(summary)
+            else:
+                filtered_items.append(
+                    {
+                        "name": name,
+                        "price": item_price,
+                        "type": item_type,
+                    }
+                )
+
+        if section_index == len(ocr_results) - 1:
+            final_section_summary_items = section_summary_items
+
+    total = pick_summary_total(final_section_summary_items)
+    if not total:
+        total = pick_summary_total(all_summary_items)
+    if not total:
+        total = sum(i.get("price", 0) or 0 for i in filtered_items)
+    if not math.isfinite(total) or abs(total) > MAX_BILL_TOTAL:
+        logger.warning("Computed total failed sanity check; falling back to sum(filtered_items)")
+        total = sum(i.get("price", 0) or 0 for i in filtered_items)
+
+    return {
+        "items": filtered_items,
+        "currency": currency,
+        "total": round(total, 2),
+    }
+
+
 # ──────────────────────────────────────────────
 # Routes
 # ──────────────────────────────────────────────
@@ -338,93 +452,42 @@ def health_check():
 
 @app.post("/extract-bill")
 @limiter.limit("10/minute")
-async def extract_bill(request: Request, file: UploadFile = File(...)):
-    content_type = file.content_type or ""
-    if not content_type.startswith("image/"):
-        raise HTTPException(status_code=400, detail="File must be an image")
-
+async def extract_bill(
+    request: Request,
+    file: Optional[UploadFile] = File(None),
+    files: Optional[List[UploadFile]] = File(None),
+):
     try:
-        # Read file in chunks to enforce size limit
-        content = b""
-        while True:
-            chunk = await file.read(1024 * 1024)
-            if not chunk:
-                break
-            content += chunk
-            if len(content) > MAX_UPLOAD_SIZE:
-                raise HTTPException(
-                    status_code=413,
-                    detail="File too large. Maximum size is 10MB.",
-                )
+        uploads = files if files else ([file] if file else [])
+        uploads = [upload for upload in uploads if upload is not None]
 
-        # Pipeline B: Cloudinary upload (fire-and-forget, parallel to OCR)
-        try:
-            task = asyncio.create_task(upload_to_cloudinary(content, file.filename or "unknown"))
-            _background_tasks.add(task)
-            task.add_done_callback(_background_tasks.discard)
-        except Exception as e:
-            logger.warning(f"Cloudinary upload init failed: {e}")
+        if not uploads:
+            raise HTTPException(status_code=400, detail="At least one image is required")
 
-        # Pipeline A: OCR processing
-        tmp_path = None
-        try:
-            with tempfile.NamedTemporaryFile(delete=False, suffix=file.filename) as tmp:
-                tmp.write(content)
-                tmp_path = tmp.name
+        upload_payloads = []
+        for index, upload in enumerate(uploads):
+            content = await read_image_upload(upload)
+            filename = upload.filename or f"receipt-{index + 1}.jpg"
+            upload_payloads.append({"content": content, "filename": filename})
+            queue_cloudinary_upload(content, filename, index)
 
-            ocr_service = get_ocr_service()
-            ocr_timeout = float(os.environ.get("OCR_TIMEOUT", 90)) + 10
+        ocr_timeout = float(os.environ.get("OCR_TIMEOUT", 90)) + 10
+        ocr_results = []
+        for payload in upload_payloads:
             ocr_result = await asyncio.wait_for(
-                asyncio.to_thread(ocr_service.extract_items, tmp_path),
+                asyncio.to_thread(
+                    run_ocr_for_upload,
+                    payload["content"],
+                    payload["filename"],
+                ),
                 timeout=ocr_timeout,
             )
-        finally:
-            if tmp_path and os.path.exists(tmp_path):
-                os.unlink(tmp_path)
+            ocr_results.append(ocr_result)
 
-        raw_items = ocr_result.get("items", []) if isinstance(ocr_result, dict) else (ocr_result if isinstance(ocr_result, list) else [])
-        items = sanitize_ocr_items(raw_items)
-        currency = ocr_result.get("currency", "") if isinstance(ocr_result, dict) else ""
-        if not currency:
-            currency = "INR"
-
-        total = 0
-        filtered_items = []
-        summary_items = []
-
-        for item in items:
-            name = item.get("name", "").strip()
-            name_lower = name.lower()
-            item_type = classify_item_type(name)
-            item_price = item.get("price", 0) or 0
-
-            is_summary = name_lower in SUMMARY_NAMES
-
-            if is_summary:
-                summary_items.append({"name": name_lower, "price": item_price})
-            else:
-                filtered_items.append(
-                    {
-                        "name": name,
-                        "price": item_price,
-                        "type": item_type,
-                    }
-                )
-
-        for priority_name in TOTAL_PRIORITY:
-            for summary in summary_items:
-                if summary["name"] == priority_name:
-                    total = summary["price"]
-                    break
-            if total:
-                break
-
-        if not total:
-            total = sum(i.get("price", 0) or 0 for i in filtered_items)
-        if not math.isfinite(total) or abs(total) > MAX_BILL_TOTAL:
-            logger.warning("Computed total failed sanity check; falling back to sum(filtered_items)")
-            total = sum(i.get("price", 0) or 0 for i in filtered_items)
-        total = round(total, 2)
+        bill_payload = build_bill_payload(ocr_results)
+        filtered_items = bill_payload["items"]
+        currency = bill_payload["currency"]
+        total = bill_payload["total"]
 
         share_url = ""
         bill_id = ""

@@ -363,6 +363,16 @@
   background: #eef2ff;
 }
 
+.receipt-preview-list {
+  display: grid;
+  gap: 16px;
+}
+
+.receipt-preview-card {
+  display: grid;
+  gap: 12px;
+}
+
 .receipt-preview img {
   display: block;
   width: 100%;
@@ -382,6 +392,12 @@
   font-size: 0.88rem;
   font-weight: 700;
   backdrop-filter: blur(8px);
+}
+
+.receipt-part-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .action-row,

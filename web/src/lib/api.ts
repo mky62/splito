@@ -132,9 +132,17 @@ async function fetchWithNetworkHint(
   }
 }
 
-export async function extractBill(file: File): Promise<ExtractResponse> {
+export async function extractBill(fileOrFiles: File | File[]): Promise<ExtractResponse> {
   const formData = new FormData()
-  formData.append('file', file, file.name)
+  const files = Array.isArray(fileOrFiles) ? fileOrFiles : [fileOrFiles]
+
+  if (files.length) {
+    formData.append('file', files[0], files[0].name)
+  }
+
+  files.forEach((file) => {
+    formData.append('files', file, file.name)
+  })
 
   const response = await fetchWithNetworkHint(
     '/extract-bill',

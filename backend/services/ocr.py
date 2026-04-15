@@ -9,10 +9,8 @@ from huggingface_hub import InferenceClient
 
 logger = logging.getLogger(__name__)
 
-EXTRACTION_MODEL = os.environ.get("OCR_EXTRACTION_MODEL", "Qwen/Qwen2.5-VL-72B-Instruct")
-CORRECTION_MODEL = os.environ.get("OCR_CORRECTION_MODEL", "openai/gpt-oss-120b")
+OCR_MODEL = os.environ.get("OCR_MODEL", "google/gemma-4-31B-it:novita")
 OCR_MAX_ABS_ITEM_PRICE = float(os.environ.get("OCR_MAX_ABS_ITEM_PRICE", "1000000"))
-OCR_MAX_ABS_TOTAL = float(os.environ.get("OCR_MAX_ABS_TOTAL", "10000000"))
 
 EXTRACTION_SYSTEM = (
     "You are a receipt OCR engine. Output only valid JSON. "
@@ -51,25 +49,6 @@ EXTRACTION_USER = (
     '{"items":[{"name":"Item Name","price":12.50}],"currency":"INR"}'
 )
 
-CORRECTION_SYSTEM = (
-    "You fix OCR extraction data. Output only valid JSON. No commentary."
-)
-
-CORRECTION_USER = """Fix these receipt items. Apply all corrections silently:
-
-PRICES: Fix letter-in-number errors (O→0, l→1). Keep numbers as-is - do NOT drop trailing zeros.
-Example: 600 is 600.00 (six hundred), NOT 60.00. 330 is 330.00, NOT 33.00.
-NAMES: Fix garbled text, normalize to Title Case, remove stray symbols.
-DUPLICATES: Remove exact duplicates.
-TAX/TOTAL: Keep CGST, SGST, VAT, Service Tax as separate items if present.
-SUMMARY ROWS: Remove summary rows like Sub Total, Gross Amount, Grand Total, Net Amount - these are calculated values, not actual items.
-
-Items:
-{items_json}
-
-Output ONLY a JSON object like: {{"items":[{{"name":"Fixed Name","price":12.50}}],"currency":"INR"}}"""
-
-
 class OCRService:
     def __init__(self, api_key: str, timeout: float = 90.0):
         self.client = InferenceClient(api_key=api_key, timeout=timeout)
@@ -85,9 +64,9 @@ class OCRService:
 
         base64_image = base64.b64encode(image_bytes).decode("utf-8")
 
-        logger.info("Starting extraction with vision model")
+        logger.info("Starting extraction with model %s", OCR_MODEL)
         completion = self.client.chat.completions.create(
-            model=EXTRACTION_MODEL,
+            model=OCR_MODEL,
             messages=[
                 {
                     "role": "system",
@@ -114,36 +93,16 @@ class OCRService:
         raw_response = completion.choices[0].message.content or ""
         logger.info(f"Extraction raw response: {raw_response[:500]}")
 
-        parsed, parse_meta = self._parse_response_with_meta(raw_response)
+        parsed, _ = self._parse_response_with_meta(raw_response)
         items = parsed.get("items", [])
         currency = parsed.get("currency", "")
-        extraction_stats = parsed.get("_sanitize_stats", self._empty_sanitize_stats())
-        logger.info(f"Extracted {len(items)} items before correction, currency={currency}")
+        logger.info(f"Extracted {len(items)} items, currency={currency}")
 
         if not items:
             logger.warning("No items extracted, returning empty list")
             return {"items": [], "currency": currency}
 
-        if self._should_skip_correction(parse_meta, extraction_stats, items):
-            logger.info("Skipping correction: extraction is clean and stable")
-            return {"items": items, "currency": currency}
-
-        corrected = self._correct_items(items, currency)
-
-        if not corrected.get("items"):
-            logger.warning("Correction returned empty, using original extraction")
-            return {"items": items, "currency": currency}
-
-        corrected_items = corrected.get("items", [])
-        corrected_stats = corrected.get("_sanitize_stats", self._empty_sanitize_stats())
-
-        if self._is_correction_worse(items, corrected_items, extraction_stats, corrected_stats):
-            logger.warning("Correction appears worse than extraction; using extraction output")
-            return {"items": items, "currency": currency}
-
-        final_currency = corrected.get("currency") or currency
-        logger.info(f"Returning {len(corrected_items)} corrected items, currency={final_currency}")
-        return {"items": corrected_items, "currency": final_currency}
+        return {"items": items, "currency": currency}
 
     def _parse_response(self, text: str) -> Dict[str, Any]:
         """Parse the LLM response into items + currency. Handles both old array format and new object format."""
@@ -154,7 +113,7 @@ class OCRService:
         }
 
     def _parse_response_with_meta(self, text: str) -> tuple[Dict[str, Any], Dict[str, Any]]:
-        """Parse response and include parse metadata for correction gating."""
+        """Parse response and include parse metadata for diagnostics."""
         text = text.strip()
         text = re.sub(r"^```(?:json)?\s*", "", text)
         text = re.sub(r"\s*```$", "", text)
@@ -293,108 +252,6 @@ class OCRService:
         stats["kept_items"] = len(result)
         stats["total_delta"] = round(abs(stats["parseable_total"] - stats["sanitized_total"]), 2)
         return result, stats
-
-    def _sum_total(self, items: List[Dict[str, Any]]) -> float:
-        return round(sum(item.get("price", 0.0) or 0.0 for item in items), 2)
-
-    def _should_skip_correction(
-        self,
-        parse_meta: Dict[str, Any],
-        sanitize_stats: Dict[str, Any],
-        items: List[Dict[str, Any]],
-    ) -> bool:
-        if not items:
-            return False
-        if parse_meta.get("parse_mode") != "direct_json":
-            return False
-
-        raw_items = max(1, int(sanitize_stats.get("raw_items", len(items)) or len(items)))
-        kept_items = max(1, int(sanitize_stats.get("kept_items", len(items)) or len(items)))
-        dropped_ratio = (sanitize_stats.get("dropped_items", 0) or 0) / raw_items
-        coerced_ratio = (sanitize_stats.get("coerced_prices", 0) or 0) / kept_items
-        trimmed_ratio = (sanitize_stats.get("trimmed_names", 0) or 0) / kept_items
-        stable_totals = (sanitize_stats.get("total_delta", 0.0) or 0.0) <= 0.01
-        extracted_total = abs(self._sum_total(items))
-
-        return (
-            dropped_ratio <= 0.05
-            and coerced_ratio <= 0.05
-            and trimmed_ratio <= 0.05
-            and stable_totals
-            and extracted_total <= OCR_MAX_ABS_TOTAL
-        )
-
-    def _is_correction_worse(
-        self,
-        extracted_items: List[Dict[str, Any]],
-        corrected_items: List[Dict[str, Any]],
-        extracted_stats: Dict[str, Any],
-        corrected_stats: Dict[str, Any],
-    ) -> bool:
-        if not corrected_items:
-            return True
-
-        extracted_total = self._sum_total(extracted_items)
-        corrected_total = self._sum_total(corrected_items)
-        if not math.isfinite(corrected_total):
-            return True
-        if abs(corrected_total) > OCR_MAX_ABS_TOTAL:
-            return True
-
-        # Guard against correction outputs that explode totals or invert sign unexpectedly.
-        if abs(corrected_total) > max(abs(extracted_total) * 2.0, abs(extracted_total) + 50.0):
-            return True
-        if extracted_total > 0 and corrected_total <= 0 and abs(extracted_total - corrected_total) > 20.0:
-            return True
-
-        extracted_count = len(extracted_items)
-        corrected_count = len(corrected_items)
-        min_allowed_count = max(1, int(extracted_count * 0.3))
-        if corrected_count < min_allowed_count:
-            return True
-
-        extracted_dropped = int(extracted_stats.get("dropped_items", 0) or 0)
-        corrected_dropped = int(corrected_stats.get("dropped_items", 0) or 0)
-        if corrected_dropped > extracted_dropped + max(3, int(extracted_count * 0.2)):
-            return True
-
-        return False
-
-    def _correct_items(self, items: List[Dict[str, Any]], currency: str) -> Dict[str, Any]:
-        if not items:
-            return {"items": items, "currency": currency}
-
-        items_json = json.dumps({"items": items, "currency": currency}, ensure_ascii=False)
-        correction_prompt = CORRECTION_USER.replace("{items_json}", items_json)
-
-        logger.info(f"Sending {len(items)} items to correction model")
-
-        try:
-            completion = self.client.chat.completions.create(
-                model=CORRECTION_MODEL,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": CORRECTION_SYSTEM,
-                    },
-                    {
-                        "role": "user",
-                        "content": correction_prompt,
-                    },
-                ],
-            )
-
-            response = completion.choices[0].message.content or ""
-            logger.info(f"Correction raw response: {response[:500]}")
-
-            parsed, _ = self._parse_response_with_meta(response)
-            if parsed.get("items"):
-                return parsed
-            return {"items": items, "currency": currency}
-
-        except Exception as e:
-            logger.error(f"Correction failed: {e}")
-            return {"items": items, "currency": currency}
 
 
 def get_ocr_service() -> OCRService:
