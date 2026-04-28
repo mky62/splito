@@ -130,20 +130,30 @@ async function fetchWithNetworkHint(
   }
 }
 
-// API Functions
-export async function extractBill(imageUri: string): Promise<ExtractResponse> {
-  const formData = new FormData();
-  
-  // Determine file type based on extension or default to jpeg
+const createImageFormPart = (imageUri: string) => {
   const filename = imageUri.split('/').pop() || 'bill.jpg';
   const match = /\.(\w+)$/.exec(filename);
   const type = match ? `image/${match[1]}` : 'image/jpeg';
-  
-  formData.append('file', {
+
+  return {
     uri: Platform.OS === 'android' ? imageUri : imageUri.replace('file://', ''),
     type,
     name: filename,
-  } as any);
+  };
+};
+
+// API Functions
+export async function extractBill(imageUriOrUris: string | string[]): Promise<ExtractResponse> {
+  const formData = new FormData();
+  const imageUris = Array.isArray(imageUriOrUris) ? imageUriOrUris : [imageUriOrUris];
+
+  if (imageUris.length) {
+    formData.append('file', createImageFormPart(imageUris[0]) as any);
+  }
+
+  imageUris.forEach((imageUri) => {
+    formData.append('files', createImageFormPart(imageUri) as any);
+  });
 
   // Use AbortController for timeout (120 seconds for OCR processing — two sequential LLM calls)
   const controller = new AbortController();

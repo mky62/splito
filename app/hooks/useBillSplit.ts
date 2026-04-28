@@ -15,7 +15,7 @@ interface UseBillExtractionReturn {
   billId: string | null;
   billTotal: number | null;
   hasExtracted: boolean;
-  extractItems: (imageUri: string) => Promise<void>;
+  extractItems: (imageUriOrUris: string | string[]) => Promise<void>;
   updateItem: (id: string, field: 'name' | 'price', value: string) => void;
   addItem: () => void;
   deleteItem: (id: string) => void;
@@ -29,14 +29,15 @@ export function useBillExtraction(): UseBillExtractionReturn {
   const [billTotal, setBillTotal] = useState<number | null>(null);
   const [hasExtracted, setHasExtracted] = useState(false);
 
-  const extractItems = useCallback(async (imageUri: string) => {
-    if (!imageUri || hasExtracted) return;
+  const extractItems = useCallback(async (imageUriOrUris: string | string[]) => {
+    const imageUris = Array.isArray(imageUriOrUris) ? imageUriOrUris : [imageUriOrUris];
+    if (!imageUris.length || hasExtracted) return;
     setLoading(true);
     setError(null);
     setHasExtracted(true);
 
     try {
-      const response = await extractBill(imageUri);
+      const response = await extractBill(imageUris.length === 1 ? imageUris[0] : imageUris);
 
       const parsedItems: BillItem[] = response.items
         .map((item: ApiBillItem, index: number) => ({

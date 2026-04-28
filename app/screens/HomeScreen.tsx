@@ -30,14 +30,16 @@ export default function HomeScreen() {
       return;
     }
 
-    const uri = response.assets?.[0]?.uri;
+    const uris = response.assets
+      ?.map((asset) => asset.uri)
+      .filter((uri): uri is string => Boolean(uri));
 
-    if (!uri) {
+    if (!uris?.length) {
       Alert.alert('Error', 'No image selected.');
       return;
     }
 
-    navigation.navigate('BillScan', { imageUri: uri });
+    navigation.navigate('BillScan', { imageUris: uris });
   };
 
   const takePhoto = async () => {
@@ -63,7 +65,7 @@ export default function HomeScreen() {
         {
           mediaType: 'photo',
           quality: 0.8,
-          selectionLimit: 1,
+          selectionLimit: 0,
         },
         handleImageResponse
       );

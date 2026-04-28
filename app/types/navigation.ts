@@ -1,5 +1,5 @@
 export type RootStackParamList = {
   Welcome: undefined;
   Home: undefined;
-  BillScan: { imageUri: string };
+  BillScan: { imageUri?: string; imageUris?: string[] };
 };

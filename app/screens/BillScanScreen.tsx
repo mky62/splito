@@ -13,7 +13,11 @@ import { SplitResults } from '../components/bill/SplitResults';
 type BillScanScreenProps = NativeStackScreenProps<RootStackParamList, 'BillScan'>;
 
 const BillScanScreen: React.FC<BillScanScreenProps> = ({ route, navigation }) => {
-  const imageUri = route.params?.imageUri || '';
+  const imageUris = React.useMemo(() => {
+    const routeImageUris = route.params?.imageUris ?? [];
+    const legacyImageUri = route.params?.imageUri;
+    return routeImageUris.length ? routeImageUris : legacyImageUri ? [legacyImageUri] : [];
+  }, [route.params?.imageUri, route.params?.imageUris]);
   const [isProcessing, setIsProcessing] = React.useState(false);
   
   const {
@@ -21,7 +25,7 @@ const BillScanScreen: React.FC<BillScanScreenProps> = ({ route, navigation }) =>
     splitSettings,
     splitResults,
     ui,
-    setImageUri,
+    setImageUris,
     setExtracting,
     setExtracted,
     setExtractionError,
@@ -36,23 +40,23 @@ const BillScanScreen: React.FC<BillScanScreenProps> = ({ route, navigation }) =>
   } = useBillStore();
 
   useEffect(() => {
-    if (imageUri) {
-      setImageUri(imageUri);
+    if (imageUris.length) {
+      setImageUris(imageUris);
     }
     return () => {
       resetBill();
     };
-  }, [imageUri, setImageUri, resetBill]);
+  }, [imageUris, setImageUris, resetBill]);
 
   const handleExtractItems = useCallback(async () => {
-    if (!imageUri || isProcessing) return;
+    if (!imageUris.length || isProcessing) return;
 
     setIsProcessing(true);
     setExtracting(true);
     setExtractionError('');
 
     try {
-      const response = await extractBill(imageUri);
+      const response = await extractBill(imageUris.length === 1 ? imageUris[0] : imageUris);
       
       const items = response.items.map((item, index) => ({
         id: `item-${index}`,
@@ -81,7 +85,7 @@ const BillScanScreen: React.FC<BillScanScreenProps> = ({ route, navigation }) =>
     } finally {
       setIsProcessing(false);
     }
-  }, [imageUri, isProcessing, setExtracting, setExtracted, setExtractionError]);
+  }, [imageUris, isProcessing, setExtracting, setExtracted, setExtractionError]);
 
   const pollIntervalRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -150,13 +154,19 @@ const BillScanScreen: React.FC<BillScanScreenProps> = ({ route, navigation }) =>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {imageUri && (
-          <View style={styles.imageCard}>
-            <Image source={{ uri: imageUri }} style={styles.billImage} />
-            <View style={styles.imageOverlay}>
-              <Receipt size={20} color="#FFFFFF" />
-              <Text style={styles.imageOverlayText}>Bill Preview</Text>
-            </View>
+        {imageUris.length > 0 && (
+          <View style={styles.previewList}>
+            {imageUris.map((uri, index) => (
+              <View style={styles.imageCard} key={`${uri}-${index}`}>
+                <Image source={{ uri }} style={styles.billImage} />
+                <View style={styles.imageOverlay}>
+                  <Receipt size={20} color="#FFFFFF" />
+                  <Text style={styles.imageOverlayText}>
+                    {imageUris.length > 1 ? `Bill Preview ${index + 1}` : 'Bill Preview'}
+                  </Text>
+                </View>
+              </View>
+            ))}
           </View>
         )}
 
@@ -215,7 +225,7 @@ const BillScanScreen: React.FC<BillScanScreenProps> = ({ route, navigation }) =>
           <ShareLinkCard shareLink={splitSettings.shareLink} totalPeople={splitSettings.totalPeople} />
         )}
 
-        {splitSettings.linkGenerated && (splitResults.expectedUsers > 0 || splitResults.numSubmitted > 0 || splitResults.allSubmitted) && (
+        {splitSettings.linkGenerated && ((splitResults.expectedUsers ?? 0) > 0 || (splitResults.numSubmitted ?? 0) > 0 || splitResults.allSubmitted) && (
           <SplitResults splitData={splitResults} />
         )}
       </ScrollView>
@@ -257,10 +267,13 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 32,
   },
+  previewList: {
+    gap: 16,
+    marginBottom: 16,
+  },
   imageCard: {
     borderRadius: 16,
     overflow: 'hidden',
-    marginBottom: 16,
     backgroundColor: '#FFFFFF',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },

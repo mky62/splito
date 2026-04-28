@@ -28,6 +28,7 @@ export interface BillState {
     total: number | null;
     currency: string;
     imageUri: string | null;
+    imageUris: string[];
   };
   splitSettings: {
     totalPeople: number;
@@ -44,7 +45,7 @@ export interface BillState {
 }
 
 interface BillActions {
-  setImageUri: (uri: string) => void;
+  setImageUris: (uris: string[]) => void;
   setExtracting: (loading: boolean) => void;
   setExtracted: (data: { items: BillItem[]; total: number; currency: string; billId: string }) => void;
   setExtractionError: (error: string) => void;
@@ -67,6 +68,7 @@ const initialState: BillState = {
     total: null,
     currency: '',
     imageUri: null,
+    imageUris: [],
   },
   splitSettings: {
     totalPeople: 2,
@@ -93,9 +95,9 @@ const initialState: BillState = {
 export const useBillStore = create<BillStore>((set) => ({
   ...initialState,
 
-  setImageUri: (uri) =>
+  setImageUris: (uris) =>
     set((state) => ({
-      currentBill: { ...state.currentBill, imageUri: uri },
+      currentBill: { ...state.currentBill, imageUri: uris[0] ?? null, imageUris: uris },
       ui: { ...state.ui, error: null },
     })),
 
